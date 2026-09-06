@@ -24,6 +24,29 @@ import {
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, testConnection } from './firebase';
 
+/**
+ * Recursively strips any object properties whose values are undefined.
+ * Firestore strictly rejects undefined field values in documents.
+ */
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object') {
+    const clean: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        clean[key] = sanitizeForFirestore(value);
+      }
+    }
+    return clean as unknown as T;
+  }
+  return data;
+}
+
 export const SEEDED_STAFF_ACCOUNTS: StaffAccount[] = [
   {
     id: 'STF-LIB-01',
@@ -464,10 +487,10 @@ export async function initializeDataStore() {
     } else {
       // Seed Firestore with baseline demo students
       for (const roll of Object.keys(studentStore)) {
-        await setDoc(doc(db, 'students', roll), studentStore[roll]);
+        await setDoc(doc(db, 'students', roll), sanitizeForFirestore(studentStore[roll]));
       }
       if (poojaProfile.certificateIssued && poojaProfile.certificateId) {
-        await setDoc(doc(db, 'certificates', poojaProfile.certificateId), {
+        await setDoc(doc(db, 'certificates', poojaProfile.certificateId), sanitizeForFirestore({
           certId: poojaProfile.certificateId,
           rollNo: poojaProfile.rollNo,
           name: poojaProfile.name,
@@ -475,7 +498,7 @@ export async function initializeDataStore() {
           masterHash: poojaProfile.masterHash,
           issuedAt: poojaProfile.certificateIssuedAt,
           signStampsCount: Object.values(poojaProfile.dues).filter((d) => d.signStamp).length,
-        });
+        }));
       }
     }
   } catch (err) {
@@ -532,7 +555,8 @@ export function notifyListeners() {
 
 export async function syncStudentToFirestore(student: StudentProfile): Promise<void> {
   try {
-    await setDoc(doc(db, 'students', student.rollNo.toUpperCase()), student);
+    const cleanStudent = sanitizeForFirestore(student);
+    await setDoc(doc(db, 'students', cleanStudent.rollNo.toUpperCase()), cleanStudent);
     notifyListeners();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `students/${student.rollNo}`);
@@ -612,15 +636,16 @@ export async function recordStaffDue(
     };
   } else {
     // Flag due: student is locked from editing amount, must pay this exact fixed figure
-    student.dues[sectionCode] = {
+    const updatedDue: DueRecord = {
       ...due,
       status: 'DUE_FLAGGED',
       amount,
       remarks: remarks || `Outstanding due of ₹${amount} recorded. Payment verification mandatory.`,
       updatedByStaffId: staff.id,
       updatedByStaffName: staff.name,
-      signStamp: undefined,
     };
+    delete updatedDue.signStamp;
+    student.dues[sectionCode] = updatedDue;
 
     await syncStudentToFirestore(student);
 
@@ -690,7 +715,7 @@ export async function verifyAndSignPayment(
   if (!verified) {
     // Rejected UTR
     due.status = 'DUE_FLAGGED';
-    due.paymentReference = undefined;
+    delete due.paymentReference;
     due.remarks = staffRemarks || 'Payment reference could not be verified. Please re-submit valid UTR or visit section.';
     await syncStudentToFirestore(student);
     return {
@@ -902,7 +927,7 @@ export async function generateCertificate(
   await syncStudentToFirestore(student);
 
   try {
-    await setDoc(doc(db, 'certificates', certId), {
+    await setDoc(doc(db, 'certificates', certId), sanitizeForFirestore({
       certId,
       rollNo: student.rollNo,
       name: student.name,
@@ -910,7 +935,7 @@ export async function generateCertificate(
       masterHash,
       issuedAt: student.certificateIssuedAt,
       signStampsCount: Object.values(student.dues).filter((d) => d.signStamp).length,
-    });
+    }));
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `certificates/${certId}`);
   }

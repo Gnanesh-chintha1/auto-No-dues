@@ -35,9 +35,17 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): void {
+  const errMessage = error instanceof Error ? error.message : String(error);
+  const errCode = typeof error === 'object' && error !== null && 'code' in error ? String((error as any).code) : '';
+
+  const isPermissionError =
+    errCode === 'permission-denied' ||
+    errMessage.includes('permission-denied') ||
+    errMessage.includes('Missing or insufficient permissions');
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -53,25 +61,27 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path,
   };
+
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+
+  // Throw structured JSON error on permission failure so rules can be diagnosed
+  if (isPermissionError) {
+    throw new Error(JSON.stringify(errInfo));
+  }
 }
 
 /**
  * Validates connection to Firestore on initial boot.
  */
-export async function testConnection(): Promise<boolean> {
+export async function testConnection(): Promise<void> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log('[Firebase] Successfully validated connection to Firestore server.');
-    return true;
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
       console.error('Please check your Firebase configuration.');
-    } else {
-      // Non-blocking if doc doesn't exist yet but server responded
-      console.log('[Firebase] Server reachable. Ready for operations.');
     }
-    return false;
   }
 }
+
+// Call on initial boot as mandated by skill
+testConnection();

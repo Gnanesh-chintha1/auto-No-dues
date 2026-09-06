@@ -3,6 +3,7 @@ import { DueRecord, StudentProfile } from '../types';
 import { TierStepper } from '../components/TierStepper';
 import { DueEntryRow } from '../components/DueEntryRow';
 import { StatusBadge } from '../components/StatusBadge';
+import { ClearanceRoadmapChart } from '../components/ClearanceRoadmapChart';
 import {
   submitStudentPayment,
   studentAcknowledge,
@@ -304,6 +305,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       {/* High-Density Overview: Dual Column (Tier 1 & Tier 2) + Tier 3 Executive Authority */}
       {activeTierTab === 0 && (
         <div className="space-y-6">
+          {/* Visual Roadmap Recharts Chart */}
+          <ClearanceRoadmapChart
+            student={student}
+            onSelectTier={(tier) => setActiveTierTab(tier)}
+          />
+
           {/* Dual Column: Tier 1 General Sections & Tier 2 Departmental Labs */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Section 1: Tier 1 General Sections */}
