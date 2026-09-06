@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { AuthSession } from '../types';
 import { ShieldCheck, LogOut, Search, Award, Menu, X, Home, ExternalLink } from 'lucide-react';
 import { gsap, useGSAP, prefersReducedMotion } from '../utils/animation';
+import { RguktEmblem } from './RguktEmblem';
 
 interface NavbarProps {
   session: AuthSession | null;
@@ -65,17 +66,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={onNavigateHome}
           className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer group min-w-0"
         >
-          {/* RGUKT Emblem Stamp */}
-          <div className="w-10 h-10 min-w-[40px] min-h-[40px] sm:w-11 sm:h-11 sm:min-w-[44px] sm:min-h-[44px] bg-white rounded-md p-1 flex flex-col items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-            <div className="w-full h-full border border-[#0F5C55] rounded-xs flex flex-col items-center justify-center text-[#0F5C55] text-center p-0.5 select-none">
-              <span className="text-[9px] sm:text-[10px] font-bold leading-tight tracking-wider text-center block">
-                RGUKT
-              </span>
-              <span className="text-[8px] sm:text-[9px] font-extrabold leading-tight tracking-widest text-center block text-[#0A433E]">
-                RKV
-              </span>
-            </div>
-          </div>
+          {/* RGUKT Institutional Emblem */}
+          <RguktEmblem />
 
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2">
