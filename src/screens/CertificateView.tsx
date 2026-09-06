@@ -4,17 +4,17 @@ import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
 import {
   Award,
-  Printer,
   Copy,
   CheckCircle2,
-  ExternalLink,
   ShieldCheck,
   ArrowLeft,
-  Share2,
   Download,
   Loader2,
+  FileCheck,
+  X,
 } from 'lucide-react';
 import { gsap, useGSAP, prefersReducedMotion } from '../utils/animation';
+import { generateOfficialCertificatePDF, triggerPDFDownload } from '../utils/pdfGenerator';
 
 interface CertificateViewProps {
   student: StudentProfile;
@@ -30,56 +30,46 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copiedHash, setCopiedHash] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [downloadNotice, setDownloadNotice] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const certRef = useRef<HTMLDivElement>(null);
+
+  const certId = student.certificateId || `RGUKT-RKV-2024-${student.branch}-${student.rollNo}`;
+  const masterHash = student.masterCertificateHash || student.masterHash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+
+  const verifyUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${certId}`;
 
   // Cinematic GSAP Certificate Entrance, Golden Seal Rotation, and Rubber-Stamp Impact
   useGSAP(
     () => {
-      if (prefersReducedMotion() || !certRef.current) return;
+      if (typeof window === 'undefined' || prefersReducedMotion() || !certRef.current) return;
 
       const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
 
       // 1. Certificate Container: Expands cleanly into view
-      tl.from(certRef.current, {
-        scale: 0.92,
-        opacity: 0,
-        duration: 0.7,
-        ease: 'power3.out',
-      })
+      tl.fromTo(
+        certRef.current,
+        { scale: 0.96, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.55, ease: 'power3.out', clearProps: 'all' }
+      )
         // 2. Golden Seal / Emblem: Rotates slightly into position
-        .from(
+        .fromTo(
           '.cert-emblem',
-          {
-            scale: 0.5,
-            rotation: -20,
-            opacity: 0,
-            duration: 0.6,
-            ease: 'back.out(1.7)',
-          },
+          { scale: 0.6, rotation: -15, opacity: 0 },
+          { scale: 1, rotation: 0, opacity: 1, duration: 0.5, ease: 'back.out(1.5)', clearProps: 'all' },
           '-=0.3'
         )
         // 3. Status Ribbon slide-in
-        .from(
+        .fromTo(
           '.cert-ribbon',
-          {
-            y: 15,
-            opacity: 0,
-            duration: 0.4,
-            ease: 'power2.out',
-          },
+          { y: 10, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.35, ease: 'power2.out', clearProps: 'all' },
           '-=0.2'
         )
         // 4. Official Endorsement Seals: Rubber-stamp impact
-        .from(
+        .fromTo(
           '.cert-stamp',
-          {
-            scale: 1.5,
-            opacity: 0,
-            stagger: 0.1,
-            duration: 0.45,
-            ease: 'bounce.out',
-          },
+          { scale: 1.15, opacity: 0 },
+          { scale: 1, opacity: 1, stagger: 0.07, duration: 0.35, ease: 'power2.out', clearProps: 'all' },
           '-=0.1'
         );
 
@@ -95,11 +85,6 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
     { scope: certRef }
   );
 
-  const certId = student.certificateId || `RGUKT-RKV-2024-${student.branch}-${student.rollNo}`;
-  const masterHash = student.masterCertificateHash || student.masterHash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-
-  const verifyUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${certId}`;
-
   useEffect(() => {
     let isMounted = true;
 
@@ -112,7 +97,7 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
           const url = await toDataURL(verifyUrl, {
             errorCorrectionLevel: 'H',
             margin: 1,
-            width: 180,
+            width: 200,
             color: {
               dark: '#1C1B18',
               light: '#FFFFFF',
@@ -122,13 +107,13 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
         } else {
           // Fallback if bundler export is shaped differently
           if (isMounted) {
-            setQrDataUrl(`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(verifyUrl)}`);
+            setQrDataUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(verifyUrl)}`);
           }
         }
       } catch (err) {
         console.warn('QR generation fallback notice:', err);
         if (isMounted) {
-          setQrDataUrl(`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(verifyUrl)}`);
+          setQrDataUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(verifyUrl)}`);
         }
       }
     };
@@ -179,96 +164,168 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
     }
   };
 
+  const getCompactSectionName = (name: string) => {
+    return name
+      .replace('Campus Library & Information Center', 'Library & Info Center')
+      .replace('Student Residential Hostels & Mess', 'Hostels & Mess Section')
+      .replace('Department of Physical Education (Sports)', 'Physical Education (Sports)')
+      .replace('University Health Center & Dispensary', 'Health Center & Dispensary')
+      .replace('Scholarships & Fee Reconciliations Section', 'Scholarships & Accounts')
+      .replace('Engineering Workshops & Central Stores', 'Engineering Workshops')
+      .replace('Examination Cell & Academic Records', 'Examination Cell (Academics)');
+  };
+
+  const getCompactLabName = (name: string) => {
+    return name
+      .replace('Department ', '')
+      .replace('Laboratory', 'Lab')
+      .replace('Laboratories', 'Labs')
+      .replace('Comprehensive ', '')
+      .replace('Viva-Voce & Project', 'Viva & Project')
+      .replace('Technical Seminar & Report', 'Seminar & Report');
+  };
+
+  const issueDateFormatted = student.certificateIssuedAt
+    ? new Date(student.certificateIssuedAt).toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : student.issuedAt
+    ? new Date(student.issuedAt).toLocaleDateString('en-IN')
+    : '06-Sep-2026';
+
+  /**
+   * Primary Official PDF Export Engine:
+   * Uses html2pdf with locked 794x1122 virtual window, letterRendering, and zero margins
+   * for exact 1:1 pixel-perfect parity with the web certificate view.
+   */
   const handleDownloadPDF = async () => {
+    const element = document.getElementById('official-certificate') || certRef.current;
+    if (!element) return;
+
     if (isGenerating) return;
     setIsGenerating(true);
-    setDownloadNotice(null);
+    setDownloadNotice({
+      message: 'Generating official PDF certificate...',
+      type: 'info',
+    });
+
+    const filename = `RGUKT_NoDues_${(student as any)?.rollNumber || student?.rollNo || 'Certificate'}.pdf`;
+
+    const opt = {
+      margin: [0, 0, 0, 0], // Zero outer margin so the certificate frame fills the page
+      filename,
+      image: { type: 'jpeg', quality: 1.0 },
+      html2canvas: {
+        scale: 2.5,          // Crisp rendering without memory bloat
+        useCORS: true,
+        letterRendering: true, // Crucial: prevents fonts from expanding/reflowing
+        scrollY: 0,
+        scrollX: 0,
+        windowWidth: 794,   // Standard 96 DPI A4 width in pixels
+        windowHeight: 1122  // Standard 96 DPI A4 height in pixels
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait' as const,
+      },
+      pagebreak: { mode: 'avoid-all' as const },
+    };
 
     try {
-      const element = certRef.current;
-      if (!element) {
-        throw new Error('Certificate element reference not found');
-      }
+      // Ensure html2canvas-pro is available globally for html2pdf UMD and modern oklab/oklch color space support
+      const html2canvasProModule = await import('html2canvas-pro');
+      const html2canvasPro = (html2canvasProModule.default || html2canvasProModule) as any;
+      (window as any).html2canvas = html2canvasPro;
 
-      // Load html2pdf dynamically with multi-layer fallback
-      let html2pdf: any;
+      const html2pdfModule = await import('html2pdf.js' as any);
+      const html2pdf = html2pdfModule.default || html2pdfModule;
+      await html2pdf().set(opt).from(element).save();
+
+      setDownloadNotice({
+        message: `Official certificate downloaded successfully: ${filename}`,
+        type: 'success',
+      });
+
+      setTimeout(() => {
+        setDownloadNotice((prev) => (prev?.type === 'success' ? null : prev));
+      }, 6000);
+    } catch (error) {
+      console.error('PDF Export Error:', error);
+      // Direct html2canvas-pro + jsPDF rendering fallback
       try {
-        const mod: any = await import('html2pdf.js');
-        html2pdf = mod?.default || mod;
-      } catch (err) {
-        console.warn('Dynamic import of html2pdf.js failed, testing window scope:', err);
-      }
+        const html2canvasProModule = await import('html2canvas-pro');
+        const html2canvasPro = (html2canvasProModule.default || html2canvasProModule) as any;
+        const { jsPDF } = await import('jspdf');
 
-      if (typeof html2pdf !== 'function' && typeof (window as any).html2pdf === 'function') {
-        html2pdf = (window as any).html2pdf;
-      }
-
-      if (typeof html2pdf !== 'function') {
-        // Fallback to CDN script injection
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-          script.onload = () => resolve(true);
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-        html2pdf = (window as any).html2pdf;
-      }
-
-      if (typeof html2pdf !== 'function') {
-        throw new Error('Could not load html2pdf generator');
-      }
-
-      const rollNumber = student?.rollNo || (student as any)?.rollNumber || 'R200188';
-      const filename = `RGUKT_NoDues_Certificate_${rollNumber}.pdf`;
-
-      const opt = {
-        margin: [6, 6, 6, 6],
-        filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
+        const canvas = await html2canvasPro(element, {
+          scale: 2.5,
           useCORS: true,
           letterRendering: true,
-          logging: false,
-          backgroundColor: '#FFFDF9',
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-      };
+          scrollY: 0,
+          scrollX: 0,
+          windowWidth: 794,
+          windowHeight: 1122,
+        });
 
-      await html2pdf().set(opt).from(element).save();
-      setDownloadNotice(`Official certificate saved as ${filename}`);
-      setTimeout(() => setDownloadNotice(null), 4000);
-    } catch (err) {
-      console.error('PDF generation failed, falling back to browser print:', err);
-      setDownloadNotice('PDF download unavailable; opening print dialog');
-      try {
-        window.print();
-      } catch (printErr) {
-        console.warn('Browser print invocation error:', printErr);
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        const pdf = new jsPDF({
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait',
+        });
+        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+        pdf.save(filename);
+
+        setDownloadNotice({
+          message: `Official certificate downloaded successfully: ${filename}`,
+          type: 'success',
+        });
+
+        setTimeout(() => {
+          setDownloadNotice((prev) => (prev?.type === 'success' ? null : prev));
+        }, 6000);
+      } catch (fallbackErr) {
+        console.error('Fallback canvas generation error:', fallbackErr);
+        // Secondary fallback to official vector generator
+        try {
+          const { filename: fallbackName, blobUrl } = await generateOfficialCertificatePDF({
+            student,
+            certId,
+            masterHash,
+            qrDataUrl,
+            issueDateFormatted,
+          });
+          const success = triggerPDFDownload(blobUrl, fallbackName);
+          if (success) {
+            setDownloadNotice({
+              message: `Official certificate downloaded successfully: ${fallbackName}`,
+              type: 'success',
+            });
+          }
+        } catch (vectorErr) {
+          console.error('Fallback PDF generation error:', vectorErr);
+          setDownloadNotice({
+            message: 'Could not generate PDF download. Please try again.',
+            type: 'error',
+          });
+        }
       }
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handlePrint = () => {
-    try {
-      window.print();
-    } catch (err) {
-      console.warn('Print triggered in sandbox/iframe:', err);
-    }
-  };
-
-  const duesList = Object.values(student.dues) as DueRecord[];
+  const duesList = Object.values(student.dues || {}) as DueRecord[];
   const tier1Items = duesList.filter((d) => d.tier === 1);
   const tier2Items = duesList.filter((d) => d.tier === 2);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
+    <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4">
       {/* Top Action Bar (hidden when printing) */}
-      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-[#E5E3DD] shadow-xs">
+      <div className="no-print print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-xl border border-[#E5E3DD] shadow-xs">
         <button
           type="button"
           onClick={onBack}
@@ -278,20 +335,13 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
           <span>Back to Student Dashboard</span>
         </button>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {downloadNotice && (
-            <div className="text-xs text-[#065F46] bg-[#ECFDF5] border border-[#A7F3D0] px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium">
-              <CheckCircle2 size={13} className="shrink-0" />
-              <span>{downloadNotice}</span>
-            </div>
-          )}
-
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           <button
             id="print-cert-btn"
             type="button"
             disabled={isGenerating}
             onClick={handleDownloadPDF}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0F5C55] hover:bg-[#0C4742] text-white text-xs font-semibold shadow-xs transition-colors min-h-[42px] cursor-pointer disabled:opacity-60"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-[#0F5C55] hover:bg-[#0C4742] text-white text-xs font-semibold shadow-xs transition-colors min-h-[40px] cursor-pointer disabled:opacity-60"
             title="Generate and download official PDF certificate file"
           >
             {isGenerating ? (
@@ -308,309 +358,351 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
           </button>
 
           <button
-            id="browser-print-btn"
+            id="copy-hash-action-btn"
             type="button"
-            onClick={handlePrint}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#D5D2C7] bg-white hover:bg-[#FAF9F5] text-xs font-semibold text-[#37352F] shadow-xs transition-colors min-h-[42px] cursor-pointer"
-            title="Open standard browser print dialog"
+            onClick={handleCopyHash}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#D5D2C7] bg-white hover:bg-[#FAF9F5] text-xs font-semibold text-[#37352F] shadow-xs transition-colors min-h-[40px] cursor-pointer"
+            title="Copy cryptographic master hash to clipboard"
           >
-            <Printer size={14} className="shrink-0" />
-            <span>Browser Print</span>
+            {copiedHash ? (
+              <CheckCircle2 size={14} className="text-[#059669] shrink-0" />
+            ) : (
+              <Copy size={14} className="shrink-0" />
+            )}
+            <span>{copiedHash ? 'Hash Copied' : 'Copy Hash'}</span>
           </button>
 
           <button
             id="open-verify-link-btn"
             type="button"
             onClick={() => onNavigateToVerify(certId)}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#0F5C55] text-[#0F5C55] bg-[#E6F4F1] hover:bg-[#D7EFEA] text-xs font-semibold shadow-xs transition-colors min-h-[42px] cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#0F5C55] text-[#0F5C55] bg-[#E6F4F1] hover:bg-[#D7EFEA] text-xs font-semibold shadow-xs transition-colors min-h-[40px] cursor-pointer"
           >
             <ShieldCheck size={14} className="shrink-0" />
-            <span>Open Verification Page</span>
+            <span>Verify Online</span>
           </button>
         </div>
       </div>
 
-      {/* Official Certificate Paper Container */}
-      <div
-        ref={certRef}
-        id="official-certificate"
-        className="bg-[#FFFDF9] border-4 border double border-[#8A8474] rounded-2xl p-4 sm:p-6 md:p-10 shadow-lg text-[#2A2824] space-y-6 sm:space-y-8 relative overflow-hidden print:border-none print:shadow-none print:p-4"
-        style={{
-          WebkitPrintColorAdjust: 'exact',
-          printColorAdjust: 'exact',
-        }}
-      >
-        {/* Subtle Watermark Stamp */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
-          <Award size={460} />
-        </div>
-
-        {/* Header: University Emblem & Title */}
-        <div className="text-center space-y-2 border-b-2 border-[#D5CEBF] pb-6 relative z-10">
-          <div className="flex justify-center mb-2">
-            <div className="cert-emblem w-16 h-16 rounded-full bg-[#FAF7EE] border-2 border-[#B8860B] flex items-center justify-center shadow-xs">
-              <Award className="w-10 h-10 text-[#B8860B]" />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-[11px] sm:text-xs font-semibold text-[#615E56] uppercase tracking-widest">
-              Government of Andhra Pradesh • Established under Act 18 of 2008
-            </p>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold font-official-serif tracking-tight text-[#1A1A1A]">
-              RAJIV GANDHI UNIVERSITY OF KNOWLEDGE TECHNOLOGIES
-            </h1>
-            <p className="text-xs sm:text-sm font-semibold text-[#44413B]">
-              RK VALLEY CAMPUS (Idupulapaya), YSR KADAPA DISTRICT, A.P. - 516330
-            </p>
-          </div>
-
-          <div className="pt-3">
-            <span className="inline-block bg-[#FAF5E6] border border-[#D5C186] text-[#634E17] font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-1.5 rounded-full uppercase tracking-wider">
-              Certificate of Digital No-Dues & Institutional Clearance
-            </span>
-          </div>
-        </div>
-
-        {/* Certificate Metadata Ribbon */}
-        <div className="cert-ribbon grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-4 rounded-xl bg-[#FAF8F2] border border-[#E5DFD1] text-xs relative z-10 font-medium">
-          <div>
-            <span className="text-[10px] text-[#787368] uppercase font-bold block">
-              Certificate Reference ID
-            </span>
-            <span className="font-mono font-bold text-xs text-[#1A1A1A] break-all">
-              {certId}
-            </span>
-          </div>
-
-          <div>
-            <span className="text-[10px] text-[#787368] uppercase font-bold block">
-              Candidate Roll Number
-            </span>
-            <span className="font-mono font-bold text-sm text-[#0F5C55]">
-              {student.rollNo}
-            </span>
-          </div>
-
-          <div>
-            <span className="text-[10px] text-[#787368] uppercase font-bold block">
-              Date & Time of Issuance
-            </span>
-            <span className="font-mono text-xs text-[#1A1A1A]">
-              {student.certificateIssuedAt
-                ? new Date(student.certificateIssuedAt).toLocaleDateString('en-IN', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })
-                : student.issuedAt
-                ? new Date(student.issuedAt).toLocaleDateString('en-IN')
-                : '06-Sep-2026'}
-            </span>
-          </div>
-
-          <div>
-            <span className="text-[10px] text-[#787368] uppercase font-bold block">
-              Cryptographic Status
-            </span>
-            <span className="text-xs font-bold text-[#059669] flex items-center gap-1.5">
-              <span className="cert-pulse-dot inline-block">
-                <CheckCircle2 size={13} className="shrink-0 text-[#059669]" />
-              </span>
-              <span>Merkle Root Verified</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Student Particulars Statement */}
-        <div className="space-y-2 text-xs sm:text-sm leading-relaxed text-[#37352F] relative z-10">
-          <p>
-            This is to certify that candidate{' '}
-            <strong className="text-base font-bold text-[#1A1A1A] underline decoration-[#B8860B]">
-              {student.name}
-            </strong>
-            , bearing University Roll Number{' '}
-            <strong className="font-mono font-bold text-[#1A1A1A]">{student.rollNo}</strong>,
-            enrolled in the{' '}
-            <strong>
-              {student.program} in {student.branch}
-            </strong>{' '}
-            (Batch of {student.batch}), has systematically completed all institutional no-dues protocols.
-          </p>
-          <p>
-            All academic laboratories, library records, residential hostels, sports equipment,
-            and administrative accounts stand reconciled with zero outstanding encumbrance (₹0.00).
-          </p>
-        </div>
-
-        {/* Table 1: Tier 1 Clearance Ledger */}
-        <div className="space-y-2 relative z-10">
-          <h3 className="font-bold text-xs text-[#44413B] uppercase tracking-wider flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#0F5C55] shrink-0" />
-            <span>Tier 1: Central University Sections (7 Offices Reconciled)</span>
-          </h3>
-
-          <div className="overflow-x-auto rounded-xl border border-[#E5DFD1]">
-            <table className="w-full text-left text-xs border-collapse min-w-[540px]">
-              <thead className="bg-[#FAF8F2] border-b border-[#E5DFD1] text-[#615C52]">
-                <tr>
-                  <th className="p-2.5 font-semibold">Section Name</th>
-                  <th className="p-2.5 font-semibold">Status</th>
-                  <th className="p-2.5 font-semibold">Amount</th>
-                  <th className="p-2.5 font-semibold">Digital SignStamp Verification</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EBE6DA]">
-                {tier1Items.map((item) => (
-                  <tr key={item.sectionCode} className="hover:bg-[#FCFAF5]">
-                    <td className="p-2.5 font-medium">{item.sectionName}</td>
-                    <td className="p-2.5">
-                      <span className="text-[#065F46] font-bold inline-flex items-center gap-1">
-                        <CheckCircle2 size={12} className="shrink-0" />
-                        <span>Cleared</span>
-                      </span>
-                    </td>
-                    <td className="p-2.5 font-mono font-bold text-[#1A1A1A]">₹0.00</td>
-                    <td className="p-2.5 text-[11px] text-[#615C52]">
-                      {item.signStamp ? (
-                        <span>
-                          Digitally signed —{' '}
-                          <strong className="text-[#1A1A1A]">{item.signStamp.officerName}</strong>,{' '}
-                          <span className="font-mono text-[10px] text-[#7A7568]">
-                            {item.signStamp.signatureHash.slice(0, 10)}...
-                          </span>
-                        </span>
-                      ) : (
-                        'Verified'
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Table 2: Tier 2 Branch Laboratories Clearance Ledger */}
-        <div className="space-y-2 relative z-10">
-          <h3 className="font-bold text-xs text-[#44413B] uppercase tracking-wider flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#33396B] shrink-0" />
-            <span>Tier 2: {student.branch} Department Laboratories & Curriculum Vivas</span>
-          </h3>
-
-          <div className="overflow-x-auto rounded-xl border border-[#E5DFD1]">
-            <table className="w-full text-left text-xs border-collapse min-w-[540px]">
-              <thead className="bg-[#FAF8F2] border-b border-[#E5DFD1] text-[#615C52]">
-                <tr>
-                  <th className="p-2.5 font-semibold">Curriculum Lab</th>
-                  <th className="p-2.5 font-semibold">Status</th>
-                  <th className="p-2.5 font-semibold">Due</th>
-                  <th className="p-2.5 font-semibold">Digital SignStamp Verification</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EBE6DA]">
-                {tier2Items.map((item) => (
-                  <tr key={item.sectionCode} className="hover:bg-[#FCFAF5]">
-                    <td className="p-2.5 font-medium">{item.sectionName}</td>
-                    <td className="p-2.5">
-                      <span className="text-[#065F46] font-bold inline-flex items-center gap-1">
-                        <CheckCircle2 size={12} className="shrink-0" />
-                        <span>Cleared</span>
-                      </span>
-                    </td>
-                    <td className="p-2.5 font-mono font-bold text-[#1A1A1A]">₹0.00</td>
-                    <td className="p-2.5 text-[11px] text-[#615C52]">
-                      {item.signStamp ? (
-                        <span>
-                          Digitally signed —{' '}
-                          <strong className="text-[#1A1A1A]">{item.signStamp.officerName}</strong>,{' '}
-                          <span className="font-mono text-[10px] text-[#7A7568]">
-                            {item.signStamp.signatureHash.slice(0, 10)}...
-                          </span>
-                        </span>
-                      ) : (
-                        'Verified'
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Tier 3: Executive Endorsements Grid & QR Code */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t-2 border-[#D5CEBF] relative z-10 items-end">
-          {/* HOD Endorsement */}
-          <div className="cert-stamp p-3 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-xs text-center space-y-1">
-            <div className="font-bold text-[#1A1A1A]">
-              {student.executiveApprovals.hod.officerName || 'Head of Department'}
-            </div>
-            <div className="text-[10px] text-[#615C52]">HOD, Dept of {student.branch}</div>
-            <div className="text-[9px] font-mono text-[#059669]">
-              Signed: {student.executiveApprovals.hod.signatureHash?.slice(0, 12)}...
-            </div>
-          </div>
-
-          {/* Student Declaration */}
-          <div className="cert-stamp p-3 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-xs text-center space-y-1">
-            <div className="font-bold text-[#1A1A1A]">{student.name}</div>
-            <div className="text-[10px] text-[#615C52]">Student Digital e-Signature</div>
-            <div className="text-[9px] font-mono text-[#059669]">
-              Acknowledged: {student.rollNo}
-            </div>
-          </div>
-
-          {/* DSW Seal */}
-          <div className="cert-stamp p-3 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-xs text-center space-y-1">
-            <div className="font-bold text-[#1A1A1A]">
-              {student.executiveApprovals.dsw.officerName || 'Dean, Students Welfare'}
-            </div>
-            <div className="text-[10px] text-[#615C52]">Dean, Students Welfare (DSW)</div>
-            <div className="text-[9px] font-mono text-[#059669]">
-              Signed: {student.executiveApprovals.dsw.signatureHash?.slice(0, 12)}...
-            </div>
-          </div>
-
-          {/* Registrar Seal with Authentic QR Code */}
-          <div className="cert-stamp p-3 rounded-lg border-2 border-[#B8860B] bg-[#FFFDF7] text-xs text-center space-y-1.5 flex flex-col items-center">
-            {qrDataUrl && (
-              <img
-                src={qrDataUrl}
-                alt="Verification QR Code"
-                className="w-24 h-24 border border-[#DDD9CE] p-1 rounded bg-white shadow-2xs"
-              />
+      {/* Dedicated Status & Download Notification Banner */}
+      {downloadNotice && (
+        <div
+          className={`no-print print:hidden flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-xs font-medium transition-all ${
+            downloadNotice.type === 'success'
+              ? 'bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]'
+              : downloadNotice.type === 'error'
+              ? 'bg-[#FEF2F2] border-[#FECACA] text-[#991B1B]'
+              : 'bg-[#EFF6FF] border-[#BFDBFE] text-[#1E40AF]'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {downloadNotice.type === 'success' ? (
+              <CheckCircle2 size={15} className="shrink-0 text-[#059669]" />
+            ) : downloadNotice.type === 'error' ? (
+              <X size={15} className="shrink-0 text-[#DC2626]" />
+            ) : (
+              <FileCheck size={15} className="shrink-0 text-[#2563EB]" />
             )}
-            <div className="font-bold text-[#1A1A1A] text-[11px]">
-              {student.executiveApprovals.registrar.officerName || 'Registrar / Director'}
-            </div>
-            <div className="text-[10px] text-[#B8860B] font-bold uppercase tracking-wider">
-              University Seal Affixed
-            </div>
+            <span>{downloadNotice.message}</span>
           </div>
-        </div>
-
-        {/* Cryptographic Merkle Root Hash Display */}
-        <div className="p-3 rounded-xl bg-[#FAF8F2] border border-[#E5DFD1] relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="space-y-0.5">
-            <span className="font-bold text-[#555045] uppercase text-[10px] tracking-wider block">
-              Master Tamper-Evident SHA-256 Hash:
-            </span>
-            <span className="font-mono text-xs text-[#1A1A1A] break-all select-all font-semibold">
-              {masterHash}
-            </span>
-          </div>
-
           <button
             type="button"
-            onClick={handleCopyHash}
-            className="self-start sm:self-auto shrink-0 px-3.5 py-2 rounded-lg border border-[#D5CEBF] bg-white hover:bg-[#F2ECE0] text-xs font-semibold text-[#37352F] flex items-center gap-1.5 transition-colors min-h-[40px] cursor-pointer"
+            onClick={() => setDownloadNotice(null)}
+            className="text-current hover:opacity-75 p-1 cursor-pointer"
+            title="Dismiss notice"
           >
-            {copiedHash ? <CheckCircle2 size={13} className="text-[#059669] shrink-0" /> : <Copy size={13} className="shrink-0" />}
-            <span>{copiedHash ? 'Hash Copied' : 'Copy Hash'}</span>
+            <X size={14} />
           </button>
+        </div>
+      )}
+
+      {/* Official Certificate Paper Container */}
+      <div className="w-full overflow-x-auto flex justify-center py-2 px-1">
+        <div
+          ref={certRef}
+          id="official-certificate"
+          className="w-[210mm] min-h-[296mm] mx-auto p-4 sm:p-5 bg-[#fcfbf7] border-[3px] border-double border-[#3b5249] shadow-2xl text-[#2A2824] relative flex flex-col justify-between box-border overflow-hidden"
+          style={{
+            boxSizing: 'border-box',
+            WebkitPrintColorAdjust: 'exact',
+            printColorAdjust: 'exact',
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
+          }}
+        >
+          {/* Subtle Watermark Stamp */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-[0.025] pointer-events-none select-none">
+            <Award size={380} />
+          </div>
+
+          {/* Header: University Emblem & Title */}
+          <div className="text-center space-y-1 border-b border-[#D5CEBF] pb-2 relative z-10">
+            <div className="flex justify-center mb-0.5">
+              <div className="cert-emblem w-12 h-12 rounded-full bg-[#FAF7EE] border-2 border-[#B8860B] flex items-center justify-center shadow-xs">
+                <Award className="w-6 h-6 text-[#B8860B]" />
+              </div>
+            </div>
+
+            <div className="space-y-0.5">
+              <p className="text-[9.5px] font-semibold text-[#615E56] uppercase tracking-widest">
+                Government of Andhra Pradesh • Established under Act 18 of 2008
+              </p>
+              <h1 className="text-xl md:text-2xl font-bold font-official-serif tracking-tight text-[#1A1A1A]">
+                RAJIV GANDHI UNIVERSITY OF KNOWLEDGE TECHNOLOGIES
+              </h1>
+              <p className="text-[11px] font-semibold text-[#44413B]">
+                RK VALLEY CAMPUS (Idupulapaya), YSR KADAPA DISTRICT, A.P. - 516330
+              </p>
+            </div>
+
+            <div className="pt-0.5">
+              <span className="inline-block bg-[#FAF5E6] border border-[#D5C186] text-[#634E17] font-bold text-[10.5px] px-4 py-0.5 rounded-full uppercase tracking-wider">
+                Certificate of Digital No-Dues & Institutional Clearance
+              </span>
+            </div>
+          </div>
+
+          {/* Certificate Metadata Ribbon */}
+          <div className="cert-ribbon grid grid-cols-4 gap-2.5 p-2.5 rounded-lg bg-[#FAF8F2] border border-[#E5DFD1] text-[10.5px] relative z-10 font-medium">
+            <div>
+              <span className="text-[9px] text-[#787368] uppercase font-bold block">
+                Certificate Reference ID
+              </span>
+              <span className="font-mono font-bold text-[10.5px] text-[#1A1A1A] truncate block" title={certId}>
+                {certId}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[9px] text-[#787368] uppercase font-bold block">
+                Candidate Roll Number
+              </span>
+              <span className="font-mono font-bold text-xs text-[#0F5C55] block">
+                {student.rollNo}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[9px] text-[#787368] uppercase font-bold block">
+                Date of Issuance
+              </span>
+              <span className="font-mono text-[10.5px] text-[#1A1A1A] block">
+                {issueDateFormatted}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[9px] text-[#787368] uppercase font-bold block">
+                Cryptographic Status
+              </span>
+              <span className="text-[10.5px] font-bold text-[#059669] flex items-center gap-1">
+                <span className="cert-pulse-dot inline-block">
+                  <CheckCircle2 size={12} className="shrink-0 text-[#059669]" />
+                </span>
+                <span>Merkle Root Verified</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Student Particulars Statement Box */}
+          <div className="space-y-1 text-xs leading-relaxed text-[#37352F] relative z-10 bg-[#FAF9F5] p-2.5 rounded-lg border border-[#EAE5D9]">
+            <p>
+              This is to certify that candidate{' '}
+              <strong className="font-bold text-[#1A1A1A] underline decoration-[#B8860B]">
+                {student.name}
+              </strong>
+              , bearing University Roll Number{' '}
+              <strong className="font-mono font-bold text-[#1A1A1A]">{student.rollNo}</strong>,
+              enrolled in{' '}
+              <strong>
+                {student.program} in {student.branch}
+              </strong>{' '}
+              (Batch of {student.batch}), has systematically completed all institutional no-dues protocols.
+            </p>
+            <p className="text-[#555045]">
+              All academic laboratories, library records, residential hostels, sports equipment,
+              and administrative accounts stand reconciled with zero outstanding encumbrance (₹0.00).
+            </p>
+          </div>
+
+          {/* Consolidated 2-Column Clearance Ledger */}
+          <div className="grid grid-cols-2 gap-3.5 my-1 relative z-10">
+            {/* Column 1: Tier 1 Clearance Table */}
+            <div className="space-y-1">
+              <h3 className="font-bold text-[10.5px] text-[#44413B] uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#0F5C55] shrink-0" />
+                <span>Tier 1: Central Sections (7 Offices)</span>
+              </h3>
+
+              <div className="rounded-lg border border-[#E5DFD1] overflow-hidden bg-white">
+                <table className="w-full text-left text-[9.5px] leading-tight border-collapse">
+                  <thead className="bg-[#FAF8F2] border-b border-[#E5DFD1] text-[#615C52]">
+                    <tr>
+                      <th className="py-1 px-2 font-semibold">Central Section</th>
+                      <th className="py-1 px-2 font-semibold text-center w-12">Due</th>
+                      <th className="py-1 px-2 font-semibold text-right">Verification</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#EBE6DA]">
+                    {tier1Items.map((item) => (
+                      <tr key={item.sectionCode} className="hover:bg-[#FCFAF5]">
+                        <td className="py-1.5 px-2 font-medium text-[#2A2824]" title={item.sectionName}>
+                          {getCompactSectionName(item.sectionName)}
+                        </td>
+                        <td className="py-1.5 px-2 text-center font-mono font-bold text-[#1A1A1A]">₹0</td>
+                        <td className="py-1.5 px-2 text-right whitespace-nowrap">
+                          <span className="text-[#065F46] font-semibold text-[9px] inline-flex items-center gap-1">
+                            <span>✓ Cleared</span>
+                            <span className="font-mono text-[#52504A]">
+                              [{item.signStamp?.signatureHash ? `DS-${item.signStamp.signatureHash.slice(0, 4).toUpperCase()}` : `DS-${item.sectionCode.slice(0, 4)}`}]
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Column 2: Tier 2 Department Laboratories Table */}
+            <div className="space-y-1">
+              <h3 className="font-bold text-[10.5px] text-[#44413B] uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#33396B] shrink-0" />
+                <span>Tier 2: {student.branch} Labs & Vivas</span>
+              </h3>
+
+              <div className="rounded-lg border border-[#E5DFD1] overflow-hidden bg-white">
+                <table className="w-full text-left text-[9.5px] leading-tight border-collapse">
+                  <thead className="bg-[#FAF8F2] border-b border-[#E5DFD1] text-[#615C52]">
+                    <tr>
+                      <th className="py-1 px-2 font-semibold">{student.branch} Lab / Viva</th>
+                      <th className="py-1 px-2 font-semibold text-center w-12">Due</th>
+                      <th className="py-1 px-2 font-semibold text-right">Verification</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#EBE6DA]">
+                    {tier2Items.map((item) => (
+                      <tr key={item.sectionCode} className="hover:bg-[#FCFAF5]">
+                        <td className="py-1.5 px-2 font-medium text-[#2A2824]" title={item.sectionName}>
+                          {getCompactLabName(item.sectionName)}
+                        </td>
+                        <td className="py-1.5 px-2 text-center font-mono font-bold text-[#1A1A1A]">₹0</td>
+                        <td className="py-1.5 px-2 text-right whitespace-nowrap">
+                          <span className="text-[#065F46] font-semibold text-[9px] inline-flex items-center gap-1">
+                            <span>✓ Cleared</span>
+                            <span className="font-mono text-[#52504A]">
+                              [{item.signStamp?.signatureHash ? `DS-${item.signStamp.signatureHash.slice(0, 4).toUpperCase()}` : `DS-${item.sectionCode.slice(0, 4)}`}]
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Institutional Zero-Encumbrance Status Ribbon */}
+          <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-lg py-1.5 px-3 text-center relative z-10">
+            <p className="text-[10px] font-bold text-[#166534] tracking-wide uppercase">
+              Total Outstanding Encumbrance: ₹0.00 (NIL) • All 14 Departments & Central Sections Reconciled
+            </p>
+          </div>
+
+          {/* Tier 3: Executive Endorsement & Seal Block (4 Columns) */}
+          <div className="grid grid-cols-4 gap-2.5 pt-2 border-t border-[#D5CEBF] relative z-10 items-stretch">
+            {/* HOD Endorsement */}
+            <div className="cert-stamp p-2 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-center flex flex-col justify-between space-y-1">
+              <div>
+                <div className="font-bold text-[#1A1A1A] text-[10.5px] truncate">
+                  {student.executiveApprovals?.hod?.officerName || 'Head of Department'}
+                </div>
+                <div className="text-[9.5px] text-[#615C52] truncate">HOD, Dept of {student.branch}</div>
+              </div>
+              <div className="bg-white border border-[#E5DFD1] rounded p-1">
+                <div className="text-[8.5px] font-bold text-[#059669]">✓ DIGITALLY SIGNED</div>
+                <div className="text-[7.5px] font-mono text-[#615C52]">
+                  Hash: {student.executiveApprovals?.hod?.signatureHash?.slice(0, 8) || 'VERIFIED'}
+                </div>
+              </div>
+            </div>
+
+            {/* Student Declaration */}
+            <div className="cert-stamp p-2 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-center flex flex-col justify-between space-y-1">
+              <div>
+                <div className="font-bold text-[#1A1A1A] text-[10.5px] truncate">{student.name}</div>
+                <div className="text-[9.5px] text-[#615C52]">Candidate e-Signature</div>
+              </div>
+              <div className="bg-white border border-[#E5DFD1] rounded p-1">
+                <div className="text-[8.5px] font-bold text-[#059669]">✓ ACKNOWLEDGED</div>
+                <div className="text-[7.5px] font-mono text-[#615C52]">Roll: {student.rollNo}</div>
+              </div>
+            </div>
+
+            {/* DSW Seal */}
+            <div className="cert-stamp p-2 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-center flex flex-col justify-between space-y-1">
+              <div>
+                <div className="font-bold text-[#1A1A1A] text-[10.5px] truncate">
+                  {student.executiveApprovals?.dsw?.officerName || 'Dean, Students Welfare'}
+                </div>
+                <div className="text-[9.5px] text-[#615C52] truncate">Dean, Students Welfare</div>
+              </div>
+              <div className="bg-white border border-[#E5DFD1] rounded p-1">
+                <div className="text-[8.5px] font-bold text-[#059669]">✓ APPROVED & SEALED</div>
+                <div className="text-[7.5px] font-mono text-[#615C52]">
+                  Hash: {student.executiveApprovals?.dsw?.signatureHash?.slice(0, 8) || 'VERIFIED'}
+                </div>
+              </div>
+            </div>
+
+            {/* Registrar Seal with Authentic QR Code */}
+            <div className="cert-stamp p-1.5 rounded-lg border-2 border-[#B8860B] bg-[#FFFDF7] text-center flex flex-col items-center justify-between">
+              {qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt="Verification QR Code"
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer"
+                  className="w-14 h-14 border border-[#DDD9CE] p-0.5 rounded bg-white shadow-2xs"
+                />
+              ) : (
+                <div className="w-14 h-14 border border-[#DDD9CE] rounded bg-white flex items-center justify-center">
+                  <Loader2 size={16} className="animate-spin text-[#B8860B]" />
+                </div>
+              )}
+              <div className="font-bold text-[#1A1A1A] text-[9.5px] leading-tight truncate max-w-full">
+                {student.executiveApprovals?.registrar?.officerName || 'Registrar / Director'}
+              </div>
+              <div className="text-[7.5px] text-[#B8860B] font-bold uppercase tracking-wider">
+                University Seal Affixed
+              </div>
+            </div>
+          </div>
+
+          {/* Cryptographic Security Footer */}
+          <div className="text-center pt-2 border-t border-[#E5DFD1] relative z-10 space-y-0.5">
+            <div
+              onClick={handleCopyHash}
+              title="Click to copy master SHA-256 digest"
+              className="cursor-pointer inline-flex items-center gap-1.5 hover:bg-[#FAF8F2] px-2.5 py-0.5 rounded transition-colors group"
+            >
+              <p className="text-[8.5px] font-mono text-[#787368] group-hover:text-[#1A1A1A] tracking-wider break-all select-all">
+                MASTER TAMPER-EVIDENT SHA-256 DIGEST: {masterHash}
+              </p>
+              <Copy size={11} className="text-[#8A8474] group-hover:text-[#1A1A1A] shrink-0" />
+            </div>
+            <p className="text-[8px] text-[#8A8474]">
+              Verified through RGUKT Blockchain Clearance Registry • Tamper Evident Official Academic Record
+            </p>
+            <p className="text-[7.5px] text-[#A8A29E]">
+              Statutory Electronic Document • Valid without manual ink signature under Section 4, Information Technology Act
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+

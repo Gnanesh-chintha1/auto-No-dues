@@ -22,13 +22,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   const navRef = useRef<HTMLElement>(null);
 
   useGSAP(() => {
-    if (prefersReducedMotion() || !navRef.current) return;
-    gsap.from(navRef.current, {
-      y: -20,
-      opacity: 0,
-      duration: 0.6,
-      ease: 'power2.out',
-    });
+    if (typeof window === 'undefined' || prefersReducedMotion() || !navRef.current) return;
+    gsap.fromTo(
+      navRef.current,
+      { y: -16, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.5, ease: 'power2.out', clearProps: 'all' }
+    );
   }, { scope: navRef });
 
   // Theme accent bar based on authenticated role

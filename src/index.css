@@ -20,11 +20,23 @@ body,
 }
 
 @layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    width: 100%;
+  }
+
   body {
     font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: #FAFAF8;
     color: #1c1c1c;
   }
+}
+
+.portal-card {
+  opacity: 1;
+  visibility: visible;
 }
 
 .font-mono-code {
@@ -36,13 +48,35 @@ body,
 }
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 0 !important;
+  }
   body {
     background-color: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   .no-print {
     display: none !important;
   }
   .print-only {
     display: block !important;
+  }
+  #official-certificate {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    width: 210mm !important;
+    min-height: 296mm !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    border: 3px double #3b5249 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 18px !important;
+    margin: 0 auto !important;
+    background-color: #fcfbf7 !important;
   }
 }

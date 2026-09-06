@@ -162,7 +162,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F6F2] flex flex-col text-[#2A2824]">
+    <div className="min-h-screen w-full overflow-x-hidden overflow-y-auto bg-[#fbfbfa] flex flex-col text-[#2A2824]">
       {/* Top Navigation */}
       <Navbar
         session={session}
