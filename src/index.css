@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/* Global Scrollbar Removal: Hide scrollbars across all elements while maintaining full scrollability */
+/* 1. Hide scrollbar for Chrome, Safari, Edge, and WebKit-based browsers */
+*::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* 2. Hide scrollbar for Firefox, IE, and legacy Edge */
+html,
+body,
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: touch;
+}
+
 @layer base {
   body {
     font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

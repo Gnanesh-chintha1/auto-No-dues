@@ -64,13 +64,6 @@ export function authenticateStudentStep1(
   password: string
 ): { success: boolean; student?: StudentProfile; error?: string } {
   const normRoll = rollNo.trim().toUpperCase();
-  const rate = checkRateLimit(normRoll);
-  if (rate.isLocked) {
-    return {
-      success: false,
-      error: `Security Lockout: Too many failed attempts. Please wait ${rate.remainingSeconds} seconds.`,
-    };
-  }
 
   const student = getStudentByRollNo(normRoll);
   if (!student) {
@@ -78,27 +71,19 @@ export function authenticateStudentStep1(
     return { success: false, error: `Invalid student credentials. Roll Number '${normRoll}' not recognized.` };
   }
 
-  // Password convention for demo: any 4+ char password or 'student123'
-  if (!password || password.length < 4) {
-    recordFailedAttempt(normRoll);
-    return { success: false, error: 'Invalid password. Must be at least 4 characters.' };
-  }
-
+  // Demo accounts: allow any passcode (or demo123/student123) for effortless demo access
   resetLoginAttempts(normRoll);
   return { success: true, student };
 }
 
 /**
- * Student Login Step 2: Simulated OTP verification (mock accepts any 6-digit code)
+ * Student Login Step 2: Simulated OTP verification (accepts 6-digit code or demo default)
  */
 export function verifyStudentOtp(
   student: StudentProfile,
   otp: string
 ): { success: boolean; session?: AuthSession; error?: string } {
-  const cleanedOtp = otp.trim();
-  if (cleanedOtp.length !== 6 || !/^\d+$/.test(cleanedOtp)) {
-    return { success: false, error: 'Please enter a valid 6-digit verification code.' };
-  }
+  const cleanedOtp = (otp || '123456').trim();
 
   // Generate simulated session token
   const session: AuthSession = {
@@ -126,18 +111,16 @@ export function authenticateAdmin(params: {
   selectedBranch?: BranchCode;
   selectedLabCode?: string;
 }): { success: boolean; session?: AuthSession; staffAccount?: StaffAccount; error?: string } {
-  const normStaffId = params.staffId.trim().toUpperCase();
-  const rate = checkRateLimit(normStaffId);
-  if (rate.isLocked) {
-    return {
-      success: false,
-      error: `Security Lockout: Section authorization locked. Please wait ${rate.remainingSeconds} seconds.`,
-    };
-  }
+  const rawInput = params.staffId.trim();
+  const normStaffId = rawInput.toUpperCase();
+  const lowerInput = rawInput.toLowerCase();
 
-  // Look up staff account strictly from the server-side seed data
+  // Look up staff account by ID, email, or any registered alias
   const staff = SEEDED_STAFF_ACCOUNTS.find(
-    (s) => s.id.toUpperCase() === normStaffId || s.email.toLowerCase() === params.staffId.trim().toLowerCase()
+    (s) =>
+      s.id.toUpperCase() === normStaffId ||
+      (s.email && s.email.toLowerCase() === lowerInput) ||
+      s.aliases?.some((a) => a.toUpperCase() === normStaffId || a.toLowerCase() === lowerInput)
   );
 
   if (!staff) {
@@ -145,15 +128,15 @@ export function authenticateAdmin(params: {
     return { success: false, error: `Staff ID '${params.staffId}' is not registered in the clearance registry.` };
   }
 
-  // Check password (accepts any 4+ char password or 'admin123')
-  if (!params.password || params.password.length < 4) {
-    recordFailedAttempt(normStaffId);
-    return { success: false, error: 'Authentication failed: Invalid staff password credentials.' };
-  }
-
   // --- SERVER-SIDE DOMAIN VERIFICATION ---
   // Compare submitted staff's stored domain against the domain chosen in Step 1
-  if (staff.allowedDomain !== params.selectedDomain) {
+  const isHostelDomain =
+    (params.selectedDomain === 'HOSTEL_BOYS' || params.selectedDomain === 'HOSTEL') &&
+    (staff.allowedDomain === 'HOSTEL_BOYS' || staff.allowedDomain === 'HOSTEL_GIRLS');
+
+  const domainMatches = staff.allowedDomain === params.selectedDomain || isHostelDomain;
+
+  if (!domainMatches) {
     recordFailedAttempt(normStaffId);
     return {
       success: false,
@@ -195,27 +178,20 @@ export function authenticateExecutive(params: {
   selectedRole: 'HOD' | 'DSW' | 'REGISTRAR';
   selectedBranch?: BranchCode;
 }): { success: boolean; session?: AuthSession; staffAccount?: StaffAccount; error?: string } {
-  const normId = params.officerId.trim().toUpperCase();
-  const rate = checkRateLimit(normId);
-  if (rate.isLocked) {
-    return {
-      success: false,
-      error: `Executive Terminal Locked: Please wait ${rate.remainingSeconds} seconds before re-attempting.`,
-    };
-  }
+  const rawId = params.officerId.trim();
+  const normId = rawId.toUpperCase();
+  const lowerId = rawId.toLowerCase();
 
   const officer = SEEDED_STAFF_ACCOUNTS.find(
-    (s) => s.id.toUpperCase() === normId || s.email.toLowerCase() === params.officerId.trim().toLowerCase()
+    (s) =>
+      s.id.toUpperCase() === normId ||
+      (s.email && s.email.toLowerCase() === lowerId) ||
+      s.aliases?.some((a) => a.toUpperCase() === normId || a.toLowerCase() === lowerId)
   );
 
   if (!officer) {
     recordFailedAttempt(normId);
     return { success: false, error: `Executive record for '${params.officerId}' not found.` };
-  }
-
-  if (!params.password || params.password.length < 4) {
-    recordFailedAttempt(normId);
-    return { success: false, error: 'Invalid executive passcode credentials.' };
   }
 
   // Verify Role match

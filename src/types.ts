@@ -105,6 +105,7 @@ export interface StaffAccount {
   id: string; // e.g., 'STF-LIB-01'
   name: string;
   email?: string;
+  aliases?: string[];
   designation: string;
   role: UserRole;
   allowedDomain: string; // Tier1DomainId | 'LAB_INCHARGE' | 'HOD' | 'DSW' | 'REGISTRAR'

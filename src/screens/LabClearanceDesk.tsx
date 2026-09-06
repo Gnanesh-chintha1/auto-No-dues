@@ -4,6 +4,8 @@ import { getAllStudents, recordStaffDue, verifyAndSignPayment } from '../service
 import { getCurriculumForStudent } from '../services/rguktCurriculum';
 import { StatusBadge } from '../components/StatusBadge';
 import { SignatureBlock } from '../components/SignatureBlock';
+import { AnimatedRupeeAmount } from '../components/AnimatedRupeeAmount';
+import { flashLedgerRow } from '../utils/animation';
 import {
   FlaskConical,
   Search,
@@ -58,6 +60,7 @@ export const LabClearanceDesk: React.FC<LabClearanceDeskProps> = ({ staff, onRef
 
   const handleRecordDue = async (amount: number) => {
     if (!selectedStudent || !currentDue) return;
+    const targetRoll = selectedStudent.rollNo;
     setActionLoading(true);
     setFeedback(null);
 
@@ -74,6 +77,14 @@ export const LabClearanceDesk: React.FC<LabClearanceDeskProps> = ({ staff, onRef
       setStaffRemarks('');
       setStaffAmount('');
       refreshData();
+
+      // GSAP soft highlight flash on updated student item
+      setTimeout(() => {
+        const rowEl = document.getElementById(`lab-student-row-${targetRoll}`);
+        if (rowEl) {
+          flashLedgerRow(rowEl, amount === 0 ? 'cleared' : 'flagged');
+        }
+      }, 100);
     } catch (err: any) {
       setActionLoading(false);
       setFeedback({ type: 'error', message: err.message || 'Action failed.' });
@@ -82,6 +93,7 @@ export const LabClearanceDesk: React.FC<LabClearanceDeskProps> = ({ staff, onRef
 
   const handleVerifyPayment = async (verified: boolean) => {
     if (!selectedStudent || !currentDue) return;
+    const targetRoll = selectedStudent.rollNo;
     setActionLoading(true);
     setFeedback(null);
 
@@ -97,6 +109,14 @@ export const LabClearanceDesk: React.FC<LabClearanceDeskProps> = ({ staff, onRef
       setFeedback({ type: verified ? 'success' : 'error', message: res.message });
       setStaffRemarks('');
       refreshData();
+
+      // GSAP soft highlight flash on verified/rejected student item
+      setTimeout(() => {
+        const rowEl = document.getElementById(`lab-student-row-${targetRoll}`);
+        if (rowEl) {
+          flashLedgerRow(rowEl, verified ? 'cleared' : 'flagged');
+        }
+      }, 100);
     } catch (err: any) {
       setActionLoading(false);
       setFeedback({ type: 'error', message: err.message || 'Verification failed.' });
@@ -345,7 +365,10 @@ export const LabClearanceDesk: React.FC<LabClearanceDeskProps> = ({ staff, onRef
                 {currentDue.status === 'DUE_FLAGGED' && (
                   <div className="space-y-3 pt-2 border-t border-[#E5E3DD]">
                     <div className="p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FCA5A5] text-xs text-[#991B1B]">
-                      <p className="font-bold">Breakage Fine Active: ₹{currentDue.amount.toLocaleString('en-IN')}</p>
+                      <p className="font-bold flex items-center gap-1.5">
+                        <span>Breakage Fine Active:</span>
+                        <AnimatedRupeeAmount amount={currentDue.amount} className="text-sm font-bold" />
+                      </p>
                       <p className="mt-0.5">Remarks: {currentDue.remarks}</p>
                       <p className="mt-1 text-[11px] text-[#7F1D1D]">
                         Student must submit bank transaction reference (UTR) to initiate verification.
@@ -373,7 +396,10 @@ export const LabClearanceDesk: React.FC<LabClearanceDeskProps> = ({ staff, onRef
                           {currentDue.paymentReference}
                         </span>
                       </div>
-                      <p className="text-[#4338CA]">Amount: ₹{currentDue.amount.toLocaleString('en-IN')}</p>
+                      <p className="text-[#4338CA] flex items-center gap-1.5">
+                        <span>Amount:</span>
+                        <AnimatedRupeeAmount amount={currentDue.amount} />
+                      </p>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">

@@ -11,7 +11,10 @@ import {
   ShieldCheck,
   ArrowLeft,
   Share2,
+  Download,
+  Loader2,
 } from 'lucide-react';
+import { gsap, useGSAP, prefersReducedMotion } from '../utils/animation';
 
 interface CertificateViewProps {
   student: StudentProfile;
@@ -26,7 +29,71 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copiedHash, setCopiedHash] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
   const certRef = useRef<HTMLDivElement>(null);
+
+  // Cinematic GSAP Certificate Entrance, Golden Seal Rotation, and Rubber-Stamp Impact
+  useGSAP(
+    () => {
+      if (prefersReducedMotion() || !certRef.current) return;
+
+      const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+
+      // 1. Certificate Container: Expands cleanly into view
+      tl.from(certRef.current, {
+        scale: 0.92,
+        opacity: 0,
+        duration: 0.7,
+        ease: 'power3.out',
+      })
+        // 2. Golden Seal / Emblem: Rotates slightly into position
+        .from(
+          '.cert-emblem',
+          {
+            scale: 0.5,
+            rotation: -20,
+            opacity: 0,
+            duration: 0.6,
+            ease: 'back.out(1.7)',
+          },
+          '-=0.3'
+        )
+        // 3. Status Ribbon slide-in
+        .from(
+          '.cert-ribbon',
+          {
+            y: 15,
+            opacity: 0,
+            duration: 0.4,
+            ease: 'power2.out',
+          },
+          '-=0.2'
+        )
+        // 4. Official Endorsement Seals: Rubber-stamp impact
+        .from(
+          '.cert-stamp',
+          {
+            scale: 1.5,
+            opacity: 0,
+            stagger: 0.1,
+            duration: 0.45,
+            ease: 'bounce.out',
+          },
+          '-=0.1'
+        );
+
+      // 5. Cryptographic Status Badge subtle breathing glow pulse
+      gsap.to('.cert-pulse-dot', {
+        scale: 1.25,
+        duration: 1,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+      });
+    },
+    { scope: certRef }
+  );
 
   const certId = student.certificateId || `RGUKT-RKV-2024-${student.branch}-${student.rollNo}`;
   const masterHash = student.masterCertificateHash || student.masterHash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
@@ -112,6 +179,80 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setDownloadNotice(null);
+
+    try {
+      const element = certRef.current;
+      if (!element) {
+        throw new Error('Certificate element reference not found');
+      }
+
+      // Load html2pdf dynamically with multi-layer fallback
+      let html2pdf: any;
+      try {
+        const mod: any = await import('html2pdf.js');
+        html2pdf = mod?.default || mod;
+      } catch (err) {
+        console.warn('Dynamic import of html2pdf.js failed, testing window scope:', err);
+      }
+
+      if (typeof html2pdf !== 'function' && typeof (window as any).html2pdf === 'function') {
+        html2pdf = (window as any).html2pdf;
+      }
+
+      if (typeof html2pdf !== 'function') {
+        // Fallback to CDN script injection
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          script.onload = () => resolve(true);
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        html2pdf = (window as any).html2pdf;
+      }
+
+      if (typeof html2pdf !== 'function') {
+        throw new Error('Could not load html2pdf generator');
+      }
+
+      const rollNumber = student?.rollNo || (student as any)?.rollNumber || 'R200188';
+      const filename = `RGUKT_NoDues_Certificate_${rollNumber}.pdf`;
+
+      const opt = {
+        margin: [6, 6, 6, 6],
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          logging: false,
+          backgroundColor: '#FFFDF9',
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+      };
+
+      await html2pdf().set(opt).from(element).save();
+      setDownloadNotice(`Official certificate saved as ${filename}`);
+      setTimeout(() => setDownloadNotice(null), 4000);
+    } catch (err) {
+      console.error('PDF generation failed, falling back to browser print:', err);
+      setDownloadNotice('PDF download unavailable; opening print dialog');
+      try {
+        window.print();
+      } catch (printErr) {
+        console.warn('Browser print invocation error:', printErr);
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handlePrint = () => {
     try {
       window.print();
@@ -138,21 +279,50 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
         </button>
 
         <div className="flex flex-wrap items-center gap-2">
+          {downloadNotice && (
+            <div className="text-xs text-[#065F46] bg-[#ECFDF5] border border-[#A7F3D0] px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium">
+              <CheckCircle2 size={13} className="shrink-0" />
+              <span>{downloadNotice}</span>
+            </div>
+          )}
+
           <button
             id="print-cert-btn"
             type="button"
+            disabled={isGenerating}
+            onClick={handleDownloadPDF}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0F5C55] hover:bg-[#0C4742] text-white text-xs font-semibold shadow-xs transition-colors min-h-[42px] cursor-pointer disabled:opacity-60"
+            title="Generate and download official PDF certificate file"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 size={14} className="shrink-0 animate-spin" />
+                <span>Generating PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download size={14} className="shrink-0" />
+                <span>Print Official PDF</span>
+              </>
+            )}
+          </button>
+
+          <button
+            id="browser-print-btn"
+            type="button"
             onClick={handlePrint}
             className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#D5D2C7] bg-white hover:bg-[#FAF9F5] text-xs font-semibold text-[#37352F] shadow-xs transition-colors min-h-[42px] cursor-pointer"
+            title="Open standard browser print dialog"
           >
             <Printer size={14} className="shrink-0" />
-            <span>Print Official PDF</span>
+            <span>Browser Print</span>
           </button>
 
           <button
             id="open-verify-link-btn"
             type="button"
             onClick={() => onNavigateToVerify(certId)}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0F5C55] hover:bg-[#0C4742] text-white text-xs font-semibold shadow-xs transition-colors min-h-[42px] cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#0F5C55] text-[#0F5C55] bg-[#E6F4F1] hover:bg-[#D7EFEA] text-xs font-semibold shadow-xs transition-colors min-h-[42px] cursor-pointer"
           >
             <ShieldCheck size={14} className="shrink-0" />
             <span>Open Verification Page</span>
@@ -163,8 +333,12 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
       {/* Official Certificate Paper Container */}
       <div
         ref={certRef}
-        id="official-certificate-document"
+        id="official-certificate"
         className="bg-[#FFFDF9] border-4 border double border-[#8A8474] rounded-2xl p-4 sm:p-6 md:p-10 shadow-lg text-[#2A2824] space-y-6 sm:space-y-8 relative overflow-hidden print:border-none print:shadow-none print:p-4"
+        style={{
+          WebkitPrintColorAdjust: 'exact',
+          printColorAdjust: 'exact',
+        }}
       >
         {/* Subtle Watermark Stamp */}
         <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
@@ -174,7 +348,7 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
         {/* Header: University Emblem & Title */}
         <div className="text-center space-y-2 border-b-2 border-[#D5CEBF] pb-6 relative z-10">
           <div className="flex justify-center mb-2">
-            <div className="w-16 h-16 rounded-full bg-[#FAF7EE] border-2 border-[#B8860B] flex items-center justify-center shadow-xs">
+            <div className="cert-emblem w-16 h-16 rounded-full bg-[#FAF7EE] border-2 border-[#B8860B] flex items-center justify-center shadow-xs">
               <Award className="w-10 h-10 text-[#B8860B]" />
             </div>
           </div>
@@ -199,7 +373,7 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
         </div>
 
         {/* Certificate Metadata Ribbon */}
-        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-4 rounded-xl bg-[#FAF8F2] border border-[#E5DFD1] text-xs relative z-10 font-medium">
+        <div className="cert-ribbon grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-4 rounded-xl bg-[#FAF8F2] border border-[#E5DFD1] text-xs relative z-10 font-medium">
           <div>
             <span className="text-[10px] text-[#787368] uppercase font-bold block">
               Certificate Reference ID
@@ -239,8 +413,10 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
             <span className="text-[10px] text-[#787368] uppercase font-bold block">
               Cryptographic Status
             </span>
-            <span className="text-xs font-bold text-[#059669] flex items-center gap-1">
-              <CheckCircle2 size={13} className="shrink-0" />
+            <span className="text-xs font-bold text-[#059669] flex items-center gap-1.5">
+              <span className="cert-pulse-dot inline-block">
+                <CheckCircle2 size={13} className="shrink-0 text-[#059669]" />
+              </span>
               <span>Merkle Root Verified</span>
             </span>
           </div>
@@ -366,7 +542,7 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
         {/* Tier 3: Executive Endorsements Grid & QR Code */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t-2 border-[#D5CEBF] relative z-10 items-end">
           {/* HOD Endorsement */}
-          <div className="p-3 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-xs text-center space-y-1">
+          <div className="cert-stamp p-3 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-xs text-center space-y-1">
             <div className="font-bold text-[#1A1A1A]">
               {student.executiveApprovals.hod.officerName || 'Head of Department'}
             </div>
@@ -377,7 +553,7 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
           </div>
 
           {/* Student Declaration */}
-          <div className="p-3 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-xs text-center space-y-1">
+          <div className="cert-stamp p-3 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-xs text-center space-y-1">
             <div className="font-bold text-[#1A1A1A]">{student.name}</div>
             <div className="text-[10px] text-[#615C52]">Student Digital e-Signature</div>
             <div className="text-[9px] font-mono text-[#059669]">
@@ -386,7 +562,7 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
           </div>
 
           {/* DSW Seal */}
-          <div className="p-3 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-xs text-center space-y-1">
+          <div className="cert-stamp p-3 rounded-lg border border-[#E5DFD1] bg-[#FAF8F2] text-xs text-center space-y-1">
             <div className="font-bold text-[#1A1A1A]">
               {student.executiveApprovals.dsw.officerName || 'Dean, Students Welfare'}
             </div>
@@ -397,7 +573,7 @@ export const CertificateView: React.FC<CertificateViewProps> = ({
           </div>
 
           {/* Registrar Seal with Authentic QR Code */}
-          <div className="p-3 rounded-lg border-2 border-[#B8860B] bg-[#FFFDF7] text-xs text-center space-y-1.5 flex flex-col items-center">
+          <div className="cert-stamp p-3 rounded-lg border-2 border-[#B8860B] bg-[#FFFDF7] text-xs text-center space-y-1.5 flex flex-col items-center">
             {qrDataUrl && (
               <img
                 src={qrDataUrl}

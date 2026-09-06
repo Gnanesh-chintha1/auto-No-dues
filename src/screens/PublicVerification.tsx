@@ -1,24 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { DueRecord, VerificationResult } from '../types';
-import {
-  verifyCertificateById,
-  tamperStudentDataForDemo,
-  restoreStudentDataForDemo,
-  getAllStudents,
-} from '../services/dataStore';
+import { verifyCertificateById } from '../services/dataStore';
 import {
   ShieldCheck,
   ShieldAlert,
   Search,
-  CheckCircle2,
-  AlertTriangle,
-  RotateCcw,
   Fingerprint,
   FileCheck2,
-  Lock,
-  ExternalLink,
-  Bug,
-  Award,
 } from 'lucide-react';
 
 interface PublicVerificationProps {
@@ -34,7 +22,6 @@ export const PublicVerification: React.FC<PublicVerificationProps> = ({
   const [activeCertId, setActiveCertId] = useState(initialCertId);
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [verifying, setVerifying] = useState(false);
-  const [tamperMessage, setTamperMessage] = useState('');
 
   // Run verification whenever activeCertId changes
   useEffect(() => {
@@ -57,33 +44,6 @@ export const PublicVerification: React.FC<PublicVerificationProps> = ({
     e.preventDefault();
     if (!certInput.trim()) return;
     setActiveCertId(certInput.trim());
-    setTamperMessage('');
-  };
-
-  // Dev Tamper Demo: mutate record live
-  const handleTamperDemo = async () => {
-    if (!result || !result.student) return;
-    try {
-      const tampered = tamperStudentDataForDemo(result.student.rollNo);
-      setTamperMessage(
-        `[Demo] Injected ₹500 fee into Central Library record for ${tampered.rollNo}. Re-evaluating cryptographic chain...`
-      );
-      await runVerification(activeCertId);
-    } catch (err: any) {
-      setTamperMessage(err.message);
-    }
-  };
-
-  // Dev Reset Demo: restore legitimate records
-  const handleResetDemo = async () => {
-    if (!result || !result.student) return;
-    try {
-      restoreStudentDataForDemo(result.student.rollNo);
-      setTamperMessage('[Demo] Record restored to legitimate cleared ledger. Re-verifying...');
-      await runVerification(activeCertId);
-    } catch (err: any) {
-      setTamperMessage(err.message);
-    }
   };
 
   return (
@@ -106,7 +66,7 @@ export const PublicVerification: React.FC<PublicVerificationProps> = ({
           <button
             type="button"
             onClick={onNavigateHome}
-            className="text-xs font-semibold text-[#0F5C55] hover:underline self-start sm:self-auto"
+            className="text-xs font-semibold text-[#0F5C55] hover:underline self-start sm:self-auto cursor-pointer"
           >
             ← Back to University Home
           </button>
@@ -151,48 +111,6 @@ export const PublicVerification: React.FC<PublicVerificationProps> = ({
             Pooja Reddy (RGUKT-RKV-2024-ECE-882104)
           </button>
         </div>
-      </div>
-
-      {/* Dev Tamper Attempt Control Bar (Requirement 8) */}
-      <div className="p-4 rounded-xl bg-[#FAF9F5] border-2 border-dashed border-[#8A8474] text-xs space-y-2.5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="bg-[#B8860B] text-white px-2 py-0.5 rounded font-mono font-bold text-[10px] tracking-wider uppercase shrink-0">
-              DEMO TOOL
-            </span>
-            <span className="font-bold text-[#2A2824]">
-              Simulate Live Data Tampering vs Merkle Cryptographic Verification
-            </span>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <button
-              id="tamper-data-btn"
-              type="button"
-              onClick={handleTamperDemo}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#991B1B] border border-[#FCA5A5] font-semibold transition-colors min-h-[40px] cursor-pointer"
-            >
-              <Bug size={13} className="shrink-0" />
-              <span>Mutate Record (Inject ₹500 Library Due)</span>
-            </button>
-
-            <button
-              id="restore-data-btn"
-              type="button"
-              onClick={handleResetDemo}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-[#F2EFE6] text-[#37352F] border border-[#D5D2C7] font-semibold transition-colors min-h-[40px] cursor-pointer"
-            >
-              <RotateCcw size={13} className="shrink-0" />
-              <span>Restore Clean Records</span>
-            </button>
-          </div>
-        </div>
-
-        {tamperMessage && (
-          <p className="text-[11px] font-mono text-[#44413B] bg-white p-2.5 rounded border border-[#E5E3DD] break-words">
-            {tamperMessage}
-          </p>
-        )}
       </div>
 
       {/* Main Verification Result Card */}

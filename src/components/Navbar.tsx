@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AuthSession } from '../types';
 import { ShieldCheck, LogOut, Search, Award, Menu, X, Home, ExternalLink } from 'lucide-react';
+import { gsap, useGSAP, prefersReducedMotion } from '../utils/animation';
 
 interface NavbarProps {
   session: AuthSession | null;
@@ -18,6 +19,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigateCertificate,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+
+  useGSAP(() => {
+    if (prefersReducedMotion() || !navRef.current) return;
+    gsap.from(navRef.current, {
+      y: -20,
+      opacity: 0,
+      duration: 0.6,
+      ease: 'power2.out',
+    });
+  }, { scope: navRef });
 
   // Theme accent bar based on authenticated role
   const getRoleHeaderBg = () => {
@@ -48,7 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      <header className={`h-16 ${headerBg} text-white flex items-center justify-between px-3 sm:px-6 border-b shadow-xs sticky top-0 z-40 w-full`}>
+      <header ref={navRef} className={`h-16 ${headerBg} text-white flex items-center justify-between px-3 sm:px-6 border-b shadow-xs sticky top-0 z-40 w-full`}>
         {/* Left: Emblem & Institutional Title */}
         <div
           onClick={onNavigateHome}

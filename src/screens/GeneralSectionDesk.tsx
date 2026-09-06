@@ -3,6 +3,8 @@ import { StaffAccount, StudentProfile } from '../types';
 import { getAllStudents, recordStaffDue, verifyAndSignPayment } from '../services/dataStore';
 import { StatusBadge } from '../components/StatusBadge';
 import { SignatureBlock } from '../components/SignatureBlock';
+import { AnimatedRupeeAmount } from '../components/AnimatedRupeeAmount';
+import { flashLedgerRow } from '../utils/animation';
 import { TIER1_SECTIONS } from '../services/rguktCurriculum';
 import {
   Building2,
@@ -63,6 +65,7 @@ export const GeneralSectionDesk: React.FC<GeneralSectionDeskProps> = ({ staff, o
 
   const handleRecordDue = async (amount: number) => {
     if (!selectedStudent || !currentSectionDue) return;
+    const targetRoll = selectedStudent.rollNo;
     setActionLoading(true);
     setActionFeedback(null);
 
@@ -79,6 +82,14 @@ export const GeneralSectionDesk: React.FC<GeneralSectionDeskProps> = ({ staff, o
       setStaffRemarks('');
       setStaffAmount('');
       refreshStudents();
+
+      // GSAP soft highlight flash on updated student item
+      setTimeout(() => {
+        const rowEl = document.getElementById(`student-ledger-item-${targetRoll}`);
+        if (rowEl) {
+          flashLedgerRow(rowEl, amount === 0 ? 'cleared' : 'flagged');
+        }
+      }, 100);
     } catch (err: any) {
       setActionLoading(false);
       setActionFeedback({ type: 'error', message: err.message || 'Operation failed.' });
@@ -87,6 +98,7 @@ export const GeneralSectionDesk: React.FC<GeneralSectionDeskProps> = ({ staff, o
 
   const handleVerifyPayment = async (verified: boolean) => {
     if (!selectedStudent || !currentSectionDue) return;
+    const targetRoll = selectedStudent.rollNo;
     setActionLoading(true);
     setActionFeedback(null);
 
@@ -105,6 +117,14 @@ export const GeneralSectionDesk: React.FC<GeneralSectionDeskProps> = ({ staff, o
       });
       setStaffRemarks('');
       refreshStudents();
+
+      // GSAP soft highlight flash on verified/rejected item
+      setTimeout(() => {
+        const rowEl = document.getElementById(`student-ledger-item-${targetRoll}`);
+        if (rowEl) {
+          flashLedgerRow(rowEl, verified ? 'cleared' : 'flagged');
+        }
+      }, 100);
     } catch (err: any) {
       setActionLoading(false);
       setActionFeedback({ type: 'error', message: err.message || 'Verification failed.' });
@@ -348,7 +368,10 @@ export const GeneralSectionDesk: React.FC<GeneralSectionDeskProps> = ({ staff, o
                 {currentSectionDue.status === 'DUE_FLAGGED' && (
                   <div className="space-y-3 pt-2 border-t border-[#E5E3DD]">
                     <div className="p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FCA5A5] text-xs text-[#991B1B]">
-                      <p className="font-bold">Due Amount Recorded: ₹{currentSectionDue.amount.toLocaleString('en-IN')}</p>
+                      <p className="font-bold flex items-center gap-1.5">
+                        <span>Due Amount Recorded:</span>
+                        <AnimatedRupeeAmount amount={currentSectionDue.amount} className="text-sm font-bold" />
+                      </p>
                       <p className="mt-0.5">Remarks: {currentSectionDue.remarks || 'Outstanding fine recorded.'}</p>
                       <p className="mt-1 text-[11px] text-[#7F1D1D]">
                         Awaiting student payment reference (UTR). The student cannot change the amount and must submit proof of payment.
@@ -378,8 +401,10 @@ export const GeneralSectionDesk: React.FC<GeneralSectionDeskProps> = ({ staff, o
                           UTR: {currentSectionDue.paymentReference}
                         </span>
                       </div>
-                      <p className="text-[#4338CA]">
-                        Recorded Amount: <strong className="font-mono">₹{currentSectionDue.amount.toLocaleString('en-IN')}</strong>. Please reconcile with university SBI bank statement.
+                      <p className="text-[#4338CA] flex items-center gap-1.5">
+                        <span>Recorded Amount:</span>
+                        <AnimatedRupeeAmount amount={currentSectionDue.amount} />
+                        <span>. Please reconcile with university SBI bank statement.</span>
                       </p>
                     </div>
 

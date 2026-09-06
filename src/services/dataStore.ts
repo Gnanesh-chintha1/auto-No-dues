@@ -22,44 +22,42 @@ import {
   onSnapshot,
   setDoc,
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, testConnection } from './firebase';
+import { db, handleFirestoreError, OperationType, testConnection, sanitizeFirestorePayload } from './firebase';
+
+export { sanitizeFirestorePayload };
 
 /**
- * Recursively strips any object properties whose values are undefined.
- * Firestore strictly rejects undefined field values in documents.
+ * Universal Firestore payload sanitizer:
+ * Recursively converts all undefined values to null so setDoc and updateDoc never throw
+ * "Unsupported field value: undefined" errors.
  */
-export function sanitizeForFirestore<T>(data: T): T {
-  if (data === null || data === undefined) {
-    return data;
-  }
-  if (Array.isArray(data)) {
-    return data.map((item) => sanitizeForFirestore(item)) as unknown as T;
-  }
-  if (typeof data === 'object') {
-    const clean: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data)) {
-      if (value !== undefined) {
-        clean[key] = sanitizeForFirestore(value);
-      }
-    }
-    return clean as unknown as T;
-  }
-  return data;
-}
+export const sanitizeForFirestore = sanitizeFirestorePayload;
 
 export const SEEDED_STAFF_ACCOUNTS: StaffAccount[] = [
   {
     id: 'STF-LIB-01',
     name: 'Dr. K. Srinivasulu',
-    email: 'librarian@rguktrkv.ac.in',
+    email: 'library@rgukt.ac.in',
+    aliases: ['STF-LIB-01', 'STF-LIB', 'librarian@rguktrkv.ac.in', 'library@rgukt.ac.in'],
     designation: 'Chief University Librarian',
     role: 'TIER1_STAFF',
     allowedDomain: 'LIBRARY',
   },
   {
+    id: 'STF-WRD-01',
+    name: 'Prof. M. Venkat Rao',
+    email: 'warden@rgukt.ac.in',
+    aliases: ['STF-WRD-01', 'STF-HST-01', 'warden.boys@rguktrkv.ac.in', 'warden@rgukt.ac.in'],
+    designation: 'Chief Warden (Boys Hostels & Messes)',
+    role: 'TIER1_STAFF',
+    allowedDomain: 'HOSTEL_BOYS',
+    genderSpecialization: 'BOYS',
+  },
+  {
     id: 'STF-HST-01',
     name: 'Prof. M. Venkat Rao',
     email: 'warden.boys@rguktrkv.ac.in',
+    aliases: ['STF-HST-01', 'STF-WRD-01', 'warden@rgukt.ac.in'],
     designation: 'Chief Warden (Boys Hostels & Messes)',
     role: 'TIER1_STAFF',
     allowedDomain: 'HOSTEL_BOYS',
@@ -69,31 +67,44 @@ export const SEEDED_STAFF_ACCOUNTS: StaffAccount[] = [
     id: 'STF-HST-02',
     name: 'Dr. B. Lakshmi Devi',
     email: 'warden.girls@rguktrkv.ac.in',
+    aliases: ['STF-HST-02', 'warden.girls@rguktrkv.ac.in', 'warden.girls@rgukt.ac.in'],
     designation: 'Chief Warden (Girls Hostels & Messes)',
     role: 'TIER1_STAFF',
     allowedDomain: 'HOSTEL_GIRLS',
     genderSpecialization: 'GIRLS',
   },
   {
-    id: 'STF-SPT-01',
-    name: 'Dr. N. Chandrasekhar',
-    email: 'sports@rguktrkv.ac.in',
-    designation: 'Physical Education Director',
-    role: 'TIER1_STAFF',
-    allowedDomain: 'SPORTS',
-  },
-  {
-    id: 'STF-ACT-01',
+    id: 'STF-ACC-01',
     name: 'Sri V. Ramana Murthy',
-    email: 'accounts@rguktrkv.ac.in',
+    email: 'accounts@rgukt.ac.in',
+    aliases: ['STF-ACC-01', 'STF-ACT-01', 'accounts@rgukt.ac.in', 'accounts@rguktrkv.ac.in'],
     designation: 'Senior Accounts Superintendent',
     role: 'TIER1_STAFF',
     allowedDomain: 'ACCOUNTS',
   },
   {
+    id: 'STF-ACT-01',
+    name: 'Sri V. Ramana Murthy',
+    email: 'accounts@rguktrkv.ac.in',
+    aliases: ['STF-ACT-01', 'STF-ACC-01', 'accounts@rgukt.ac.in'],
+    designation: 'Senior Accounts Superintendent',
+    role: 'TIER1_STAFF',
+    allowedDomain: 'ACCOUNTS',
+  },
+  {
+    id: 'STF-SPT-01',
+    name: 'Dr. N. Chandrasekhar',
+    email: 'sports@rgukt.ac.in',
+    aliases: ['STF-SPT-01', 'sports@rguktrkv.ac.in', 'sports@rgukt.ac.in'],
+    designation: 'Physical Education Director',
+    role: 'TIER1_STAFF',
+    allowedDomain: 'SPORTS',
+  },
+  {
     id: 'STF-TPO-01',
     name: 'Sri P. Sumanth',
     email: 'tpo@rguktrkv.ac.in',
+    aliases: ['STF-TPO-01', 'tpo@rgukt.ac.in', 'tpo@rguktrkv.ac.in'],
     designation: 'Training & Placement Officer',
     role: 'TIER1_STAFF',
     allowedDomain: 'TPO',
@@ -102,6 +113,7 @@ export const SEEDED_STAFF_ACCOUNTS: StaffAccount[] = [
     id: 'STF-EXM-01',
     name: 'Dr. T. Hemalatha',
     email: 'coe@rguktrkv.ac.in',
+    aliases: ['STF-EXM-01', 'coe@rgukt.ac.in', 'coe@rguktrkv.ac.in'],
     designation: 'Additional Controller of Examinations',
     role: 'TIER1_STAFF',
     allowedDomain: 'EXAM_CELL',
@@ -110,6 +122,7 @@ export const SEEDED_STAFF_ACCOUNTS: StaffAccount[] = [
     id: 'STF-ADV-01',
     name: 'Dr. G. Rajesh Kumar',
     email: 'advisor@rguktrkv.ac.in',
+    aliases: ['STF-ADV-01', 'advisor@rgukt.ac.in', 'advisor@rguktrkv.ac.in'],
     designation: 'Senior Associate Professor & Faculty Mentor',
     role: 'TIER1_STAFF',
     allowedDomain: 'FACULTY_ADVISOR',
@@ -227,14 +240,50 @@ function buildInitialDuesForStudent(branch: BranchCode, gender: 'M' | 'F'): Reco
 // Initial Seed Store
 let studentStore: Record<string, StudentProfile> = {};
 
+const DEMO_STORAGE_KEY = 'rgukt_demo_student_store_v4';
+
+function saveToLocalStorage() {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(studentStore));
+    } catch (e) {
+      console.warn('Could not persist studentStore to localStorage:', e);
+    }
+  }
+}
+
+function loadFromLocalStorage(): boolean {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const data = localStorage.getItem(DEMO_STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          studentStore = parsed;
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load studentStore from localStorage:', e);
+    }
+  }
+  return false;
+}
+
 /**
  * Seeds our 4 required demo student personas with authentic mock state.
  */
-export async function initializeDataStore() {
-  if (Object.keys(studentStore).length > 0) return;
+export async function initializeDataStore(forceReset: boolean = false) {
+  if (!forceReset && Object.keys(studentStore).length > 0) return;
+
+  // Attempt to hydrate from localStorage first for instant state persistence
+  if (!forceReset && loadFromLocalStorage()) {
+    notifyListeners();
+    return;
+  }
 
   // 1. Alex Mercer (R200142, B.Tech CSE, In Progress)
-  // Has some cleared, 1 flagged due in Library (₹450), labs partly signed
+  // Has some cleared, 1 flagged due in Library (₹450), 1 in Sports (₹200)
   const alexDues = buildInitialDuesForStudent('CSE', 'M');
 
   // Library has flagged due
@@ -247,13 +296,23 @@ export async function initializeDataStore() {
     updatedByStaffName: 'Dr. K. Srinivasulu',
   };
 
+  // Sports has flagged due
+  alexDues['T1_SPORTS'] = {
+    ...alexDues['T1_SPORTS'],
+    status: 'DUE_FLAGGED',
+    amount: 200,
+    remarks: 'Badminton racquet and tournament sports kit return pending.',
+    updatedByStaffId: 'STF-SPT-01',
+    updatedByStaffName: 'Dr. N. Chandrasekhar',
+  };
+
   // Accounts cleared
   const stampAccounts = await generateSignStamp({
     studentId: 'R200142',
     branch: 'CSE',
     sectionCode: 'T1_ACCOUNTS',
     sectionName: 'University Accounts & Fee Settlement Section',
-    officerId: 'STF-ACT-01',
+    officerId: 'STF-ACC-01',
     officerName: 'Sri V. Ramana Murthy',
     officerDesignation: 'Senior Accounts Superintendent',
     duesAmount: 0,
@@ -264,7 +323,7 @@ export async function initializeDataStore() {
     status: 'CLEARED',
     amount: 0,
     remarks: 'All 8 semesters tuition and RTF scholarship settled.',
-    updatedByStaffId: 'STF-ACT-01',
+    updatedByStaffId: 'STF-ACC-01',
     updatedByStaffName: 'Sri V. Ramana Murthy',
     signStamp: stampAccounts,
   };
@@ -275,7 +334,7 @@ export async function initializeDataStore() {
     branch: 'CSE',
     sectionCode: 'T1_HOSTEL_BOYS',
     sectionName: "Boys' Hostel & Central Mess Committee",
-    officerId: 'STF-HST-01',
+    officerId: 'STF-WRD-01',
     officerName: 'Prof. M. Venkat Rao',
     officerDesignation: 'Chief Warden (Boys Hostels & Messes)',
     duesAmount: 0,
@@ -301,6 +360,13 @@ export async function initializeDataStore() {
     duesAmount: 0,
     timestamp: '2026-09-03T11:00:00Z',
   });
+  alexDues['T2_CSE_CSE-201'] = {
+    ...alexDues['T2_CSE_CSE-201'],
+    status: 'CLEARED',
+    amount: 0,
+    remarks: 'All lab records submitted and terminal practical cleared.',
+    signStamp: stampDsa,
+  };
   alexDues['T2_CSE_CSE-201'] = {
     ...alexDues['T2_CSE_CSE-201'],
     status: 'CLEARED',
@@ -392,7 +458,41 @@ export async function initializeDataStore() {
 
   // 3. Kiran Kumar (R210050, PUC Wing P2) - 8 Foundational Labs only
   const kiranDues = buildInitialDuesForStudent('PUC-WING', 'M');
-  // Clearance in progress
+  // Library has overdue fine
+  kiranDues['T1_LIBRARY'] = {
+    ...kiranDues['T1_LIBRARY'],
+    status: 'DUE_FLAGGED',
+    amount: 120,
+    remarks: '1 Overdue Textbook (Concepts of Physics Vol 1 by H.C. Verma). Clean return required.',
+    updatedByStaffId: 'STF-LIB-01',
+    updatedByStaffName: 'Dr. K. Srinivasulu',
+  };
+  // Accounts has mess arrears
+  kiranDues['T1_ACCOUNTS'] = {
+    ...kiranDues['T1_ACCOUNTS'],
+    status: 'DUE_FLAGGED',
+    amount: 1500,
+    remarks: 'Mess Fee Arrears & Semester Caution Balance.',
+    updatedByStaffId: 'STF-ACC-01',
+    updatedByStaffName: 'Sri V. Ramana Murthy',
+  };
+  // Hostel is pending review
+  kiranDues['T1_HOSTEL_BOYS'] = {
+    ...kiranDues['T1_HOSTEL_BOYS'],
+    status: 'PENDING_REVIEW',
+    amount: 0,
+    remarks: 'Hostel room inventory inspection and furniture checklist pending.',
+  };
+  // Sports cleared
+  kiranDues['T1_SPORTS'] = {
+    ...kiranDues['T1_SPORTS'],
+    status: 'CLEARED',
+    amount: 0,
+    remarks: 'Sports inventory and kit returned.',
+    updatedByStaffId: 'STF-SPT-01',
+    updatedByStaffName: 'Dr. N. Chandrasekhar',
+  };
+
   const kiranProfile: StudentProfile = {
     rollNo: 'R210050',
     name: 'Kiran Kumar',
@@ -417,8 +517,42 @@ export async function initializeDataStore() {
   };
 
   // 4. Fresh Student (R200999, B.Tech EEE, Ready to Initiate)
-  // All line items strictly PENDING_REVIEW! Staff must enter first.
   const freshDues = buildInitialDuesForStudent('EEE', 'M');
+  // Accounts has tuition fee arrears
+  freshDues['T1_ACCOUNTS'] = {
+    ...freshDues['T1_ACCOUNTS'],
+    status: 'DUE_FLAGGED',
+    amount: 3200,
+    remarks: 'Tuition Fee Balance & Examination Fee Arrears.',
+    updatedByStaffId: 'STF-ACC-01',
+    updatedByStaffName: 'Sri V. Ramana Murthy',
+  };
+  // Hostel has room maintenance dues
+  freshDues['T1_HOSTEL_BOYS'] = {
+    ...freshDues['T1_HOSTEL_BOYS'],
+    status: 'DUE_FLAGGED',
+    amount: 350,
+    remarks: 'Room BH-2/104 maintenance fee & mess dues.',
+    updatedByStaffId: 'STF-WRD-01',
+    updatedByStaffName: 'Prof. M. Venkat Rao',
+  };
+  // Sports has gym locker kit dues
+  freshDues['T1_SPORTS'] = {
+    ...freshDues['T1_SPORTS'],
+    status: 'DUE_FLAGGED',
+    amount: 150,
+    remarks: 'Gymnasium locker key return and fitness kit dues.',
+    updatedByStaffId: 'STF-SPT-01',
+    updatedByStaffName: 'Dr. N. Chandrasekhar',
+  };
+  // Library pending review
+  freshDues['T1_LIBRARY'] = {
+    ...freshDues['T1_LIBRARY'],
+    status: 'PENDING_REVIEW',
+    amount: 0,
+    remarks: 'Library RFID card scan and return verification pending.',
+  };
+
   const freshProfile: StudentProfile = {
     rollNo: 'R200999',
     name: 'Fresh Student (S. Tarun)',
@@ -469,6 +603,8 @@ export async function initializeDataStore() {
   studentStore['R200188'] = poojaProfile;
   studentStore['R210050'] = kiranProfile;
   studentStore['R200999'] = freshProfile;
+
+  saveToLocalStorage();
 
   // Validate connection to Firestore as mandated by skill
   await testConnection();
@@ -554,12 +690,82 @@ export function notifyListeners() {
 }
 
 export async function syncStudentToFirestore(student: StudentProfile): Promise<void> {
+  saveToLocalStorage();
   try {
     const cleanStudent = sanitizeForFirestore(student);
     await setDoc(doc(db, 'students', cleanStudent.rollNo.toUpperCase()), cleanStudent);
     notifyListeners();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `students/${student.rollNo}`);
+    notifyListeners();
+  }
+}
+
+/**
+ * Completely resets mock & demo state back to baseline seed.
+ * Clears localStorage and re-populates studentStore.
+ */
+export async function resetDemoData(): Promise<StudentProfile[]> {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      localStorage.removeItem(DEMO_STORAGE_KEY);
+    } catch (e) {
+      console.warn('Failed removing demo storage key:', e);
+    }
+  }
+  studentStore = {};
+  await initializeDataStore(true);
+  notifyListeners();
+  return getAllStudents();
+}
+
+/**
+ * One-click approve and clear due with valid cryptographic signature stamp.
+ */
+export async function quickApproveDue(
+  rollNo: string,
+  sectionCode: string,
+  staff: StaffAccount,
+  remarks?: string
+): Promise<{ success: boolean; message: string; student: StudentProfile }> {
+  return recordStaffDue(
+    rollNo,
+    sectionCode,
+    0,
+    remarks || `Cleared & approved with authority signature by ${staff.name} (${staff.designation})`,
+    staff
+  );
+}
+
+/**
+ * One-click toggle between Cleared and Flagged Due.
+ */
+export async function quickToggleDue(
+  rollNo: string,
+  sectionCode: string,
+  staff: StaffAccount
+): Promise<{ success: boolean; message: string; student: StudentProfile }> {
+  const student = studentStore[rollNo.toUpperCase()];
+  if (!student) throw new Error(`Student ${rollNo} not found.`);
+  const due = student.dues[sectionCode];
+  if (!due) throw new Error(`Section ${sectionCode} not found for student.`);
+
+  if (due.status === 'CLEARED') {
+    return recordStaffDue(
+      rollNo,
+      sectionCode,
+      250,
+      `Due flagged for verification by ${staff.name}`,
+      staff
+    );
+  } else {
+    return recordStaffDue(
+      rollNo,
+      sectionCode,
+      0,
+      `Quick Clearance approved by ${staff.name} (${staff.designation})`,
+      staff
+    );
   }
 }
 
@@ -1080,37 +1286,5 @@ export async function verifyCertificateById(certIdOrRoll: string): Promise<Verif
   };
 }
 
-/**
- * Mutates student record for presenter tamper demonstration
- */
-export function tamperStudentDataForDemo(rollNo: string): StudentProfile {
-  const student = studentStore[rollNo.toUpperCase()];
-  if (!student) throw new Error(`Student ${rollNo} not found.`);
 
-  // Find a cleared item to mutate (e.g. Central Library)
-  const libKey = Object.keys(student.dues).find((k) => k.includes('LIB')) || Object.keys(student.dues)[0];
-  if (libKey && student.dues[libKey]) {
-    student.dues[libKey].amount = 500;
-    student.dues[libKey].remarks =
-      '[DEMO TAMPER]: Injected ₹500 library overdue fee into ledger after certificate issuance!';
-  }
-
-  return JSON.parse(JSON.stringify(student));
-}
-
-/**
- * Restores student record to authentic cleared state
- */
-export function restoreStudentDataForDemo(rollNo: string): StudentProfile {
-  const student = studentStore[rollNo.toUpperCase()];
-  if (!student) throw new Error(`Student ${rollNo} not found.`);
-
-  const libKey = Object.keys(student.dues).find((k) => k.includes('LIB')) || Object.keys(student.dues)[0];
-  if (libKey && student.dues[libKey]) {
-    student.dues[libKey].amount = 0;
-    student.dues[libKey].remarks = 'Reconciled: All books surrendered. ₹0 due.';
-  }
-
-  return JSON.parse(JSON.stringify(student));
-}
 

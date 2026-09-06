@@ -67,7 +67,23 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess, onBack })
     }, 400);
   };
 
-  const handlePrefill = (prefillRoll: string, prefillPass: string = 'student123') => {
+  const handleOneClickStudentLogin = (demoRoll: string) => {
+    setRollNo(demoRoll);
+    setPassword('demo123');
+    setError('');
+    const res = authenticateStudentStep1(demoRoll, 'demo123');
+    if (!res.success || !res.student) {
+      setError(res.error || 'Student not found in registry.');
+      return;
+    }
+    // Instantly verify OTP and complete login
+    const otpRes = verifyStudentOtp(res.student, '123456');
+    if (otpRes.success && otpRes.session) {
+      onSuccess(otpRes.session);
+    }
+  };
+
+  const handlePrefill = (prefillRoll: string, prefillPass: string = 'demo123') => {
     setRollNo(prefillRoll);
     setPassword(prefillPass);
     setError('');
@@ -115,6 +131,16 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess, onBack })
 
         {step === 1 ? (
           <form onSubmit={handleStep1Submit} className="space-y-4">
+            {/* Demo Passcode Notice Banner */}
+            <div className="p-3 rounded-lg bg-[#FAF9F5] border border-[#E5E3DD] flex items-center justify-between text-xs">
+              <span className="text-[#615E56] font-medium">
+                Demo Passcode: <span className="font-mono font-bold text-[#1A1A1A]">demo123</span>
+              </span>
+              <span className="text-[11px] font-semibold text-[#0F5C55] bg-[#E6F4F1] px-2 py-0.5 rounded-full border border-[#A3D9D2]">
+                1-Click Instant Login
+              </span>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-[#37352F] mb-1 uppercase tracking-wide">
                 University Roll Number (Identity Key)
@@ -148,59 +174,117 @@ export const StudentLogin: React.FC<StudentLoginProps> = ({ onSuccess, onBack })
                   disabled={lockCountdown > 0}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="•••••••• (e.g. demo123)"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-[#D5D2C7] text-sm bg-white focus:outline-hidden focus:ring-2 focus:ring-[#0F5C55] disabled:opacity-50 min-h-[44px]"
                 />
               </div>
             </div>
 
-            <button
-              id="student-step1-submit-btn"
-              type="submit"
-              disabled={lockCountdown > 0}
-              className="w-full py-2.5 px-4 rounded-xl bg-[#0F5C55] hover:bg-[#0C4742] text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-xs min-h-[44px] cursor-pointer"
-            >
-              <span>Validate Credentials</span>
-              <ArrowRight size={15} className="shrink-0" />
-            </button>
+            <div className="space-y-2">
+              <button
+                id="student-step1-submit-btn"
+                type="submit"
+                disabled={lockCountdown > 0}
+                className="w-full py-2.5 px-4 rounded-xl bg-[#0F5C55] hover:bg-[#0C4742] text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-xs min-h-[44px] cursor-pointer"
+              >
+                <span>Validate Credentials</span>
+                <ArrowRight size={15} className="shrink-0" />
+              </button>
 
-            {/* Quick Demo Fillers */}
-            <div className="pt-4 border-t border-[#F0EFEB]">
-              <span className="text-[11px] font-semibold text-[#615E56] block mb-2">
-                Quick Fill Demo Accounts:
-              </span>
+              <button
+                id="quick-bypass-student-btn"
+                type="button"
+                onClick={() => handleOneClickStudentLogin('R200142')}
+                className="w-full py-2.5 px-4 rounded-xl bg-[#33396B] hover:bg-[#282D54] text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors shadow-xs min-h-[44px] cursor-pointer"
+              >
+                <span>⚡ Quick Bypass / Demo Access (Alex - R200142)</span>
+              </button>
+            </div>
+
+            {/* Quick Demo Fillers & 1-Click Login */}
+            <div className="pt-4 border-t border-[#F0EFEB] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#37352F]">
+                  Quick Demo Students (Click to Log In Now):
+                </span>
+                <span className="text-[10px] text-[#615E56]">Instant Access</span>
+              </div>
+
               <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 text-xs">
                 <button
                   type="button"
-                  onClick={() => handlePrefill('R200142')}
-                  className="p-2.5 text-left rounded-lg bg-[#F7F6F2] hover:bg-[#EBE8DE] border border-[#DDD9CE] font-mono transition-colors min-h-[44px] cursor-pointer"
+                  onClick={() => handleOneClickStudentLogin('R200142')}
+                  className="p-2.5 text-left rounded-xl bg-[#F0F7F6] hover:bg-[#E0F0EE] border border-[#A3D9D2] transition-all min-h-[50px] cursor-pointer group flex flex-col justify-between"
                 >
-                  <span className="font-semibold block text-[#1A1A1A]">R200142</span>
-                  <span className="text-[10px] text-[#615E56]">Alex (CSE)</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-[#0F5C55]">R200142</span>
+                    <span className="text-[10px] font-semibold text-[#0F5C55] group-hover:translate-x-0.5 transition-transform">
+                      Enter ➔
+                    </span>
+                  </div>
+                  <span className="font-medium text-[11px] text-[#1A1A1A] mt-0.5">
+                    Alex (CSE - Active Dues)
+                  </span>
+                  <span className="text-[10px] text-[#0F5C55]">
+                    Interactive Due Records
+                  </span>
                 </button>
+
                 <button
                   type="button"
-                  onClick={() => handlePrefill('R200188')}
-                  className="p-2.5 text-left rounded-lg bg-[#F7F6F2] hover:bg-[#EBE8DE] border border-[#DDD9CE] font-mono transition-colors min-h-[44px] cursor-pointer"
+                  onClick={() => handleOneClickStudentLogin('R200188')}
+                  className="p-2.5 text-left rounded-xl bg-[#F0FDF4] hover:bg-[#DCFCE7] border border-[#BBF7D0] transition-all min-h-[50px] cursor-pointer group flex flex-col justify-between"
                 >
-                  <span className="font-semibold block text-[#1A1A1A]">R200188</span>
-                  <span className="text-[10px] text-[#615E56]">Pooja (Ready Cert)</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-[#15803D]">R200188</span>
+                    <span className="text-[10px] font-semibold text-[#15803D] group-hover:translate-x-0.5 transition-transform">
+                      Enter ➔
+                    </span>
+                  </div>
+                  <span className="font-medium text-[11px] text-[#1A1A1A] mt-0.5">
+                    Pooja (ECE - 100% Cleared)
+                  </span>
+                  <span className="text-[10px] text-[#15803D]">
+                    Ready for Certificate
+                  </span>
                 </button>
+
                 <button
                   type="button"
-                  onClick={() => handlePrefill('R210050')}
-                  className="p-2.5 text-left rounded-lg bg-[#F7F6F2] hover:bg-[#EBE8DE] border border-[#DDD9CE] font-mono transition-colors min-h-[44px] cursor-pointer"
+                  onClick={() => handleOneClickStudentLogin('R210050')}
+                  className="p-2.5 text-left rounded-xl bg-[#FFFBEB] hover:bg-[#FEF3C7] border border-[#FDE68A] transition-all min-h-[50px] cursor-pointer group flex flex-col justify-between"
                 >
-                  <span className="font-semibold block text-[#1A1A1A]">R210050</span>
-                  <span className="text-[10px] text-[#615E56]">Kiran (PUC Wing)</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-[#B45309]">R210050</span>
+                    <span className="text-[10px] font-semibold text-[#B45309] group-hover:translate-x-0.5 transition-transform">
+                      Enter ➔
+                    </span>
+                  </div>
+                  <span className="font-medium text-[11px] text-[#1A1A1A] mt-0.5">
+                    Kiran (MECH - Hostel Due)
+                  </span>
+                  <span className="text-[10px] text-[#B45309]">
+                    Tier-1 Pending Clearance
+                  </span>
                 </button>
+
                 <button
                   type="button"
-                  onClick={() => handlePrefill('R200999')}
-                  className="p-2.5 text-left rounded-lg bg-[#F7F6F2] hover:bg-[#EBE8DE] border border-[#DDD9CE] font-mono transition-colors min-h-[44px] cursor-pointer"
+                  onClick={() => handleOneClickStudentLogin('R200999')}
+                  className="p-2.5 text-left rounded-xl bg-[#FAF5FF] hover:bg-[#F3E8FF] border border-[#E9D5FF] transition-all min-h-[50px] cursor-pointer group flex flex-col justify-between"
                 >
-                  <span className="font-semibold block text-[#1A1A1A]">R200999</span>
-                  <span className="text-[10px] text-[#615E56]">Tarun (EEE Fresh)</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-[#7E22CE]">R200999</span>
+                    <span className="text-[10px] font-semibold text-[#7E22CE] group-hover:translate-x-0.5 transition-transform">
+                      Enter ➔
+                    </span>
+                  </div>
+                  <span className="font-medium text-[11px] text-[#1A1A1A] mt-0.5">
+                    Tarun (EEE - Fresh App)
+                  </span>
+                  <span className="text-[10px] text-[#7E22CE]">
+                    Clearance In Progress
+                  </span>
                 </button>
               </div>
             </div>

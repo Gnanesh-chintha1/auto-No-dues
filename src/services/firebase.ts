@@ -9,6 +9,17 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
+/**
+ * Helper to recursively remove all undefined values or replace with null
+ * Firestore strictly rejects undefined values in setDoc / updateDoc operations.
+ */
+export const sanitizeFirestorePayload = <T>(obj: T): T => {
+  if (obj === undefined) return null as unknown as T;
+  return JSON.parse(
+    JSON.stringify(obj, (_key, value) => (value === undefined ? null : value))
+  );
+};
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',

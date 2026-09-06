@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   GraduationCap,
   ShieldCheck,
@@ -11,6 +11,7 @@ import {
   FileCheck2,
   Sparkles,
 } from 'lucide-react';
+import { gsap, useGSAP, prefersReducedMotion } from '../utils/animation';
 
 interface LandingProps {
   onSelectFlow: (flow: 'student' | 'admin' | 'executive' | 'verify') => void;
@@ -18,24 +19,121 @@ interface LandingProps {
 }
 
 export const Landing: React.FC<LandingProps> = ({ onSelectFlow, onQuickDemo }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Staggered cinematic entrance timeline
+  useGSAP(
+    () => {
+      if (prefersReducedMotion() || !containerRef.current) return;
+
+      const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+
+      // 1. Campus Pill Badge - scale in with spring
+      tl.from('.hero-badge', {
+        scale: 0.8,
+        opacity: 0,
+        duration: 0.5,
+        ease: 'back.out(1.5)',
+      })
+        // 2. Main H1 Headline - staggered reveal of parts
+        .from(
+          '.hero-title-part',
+          {
+            y: 30,
+            opacity: 0,
+            duration: 0.8,
+            stagger: 0.12,
+            ease: 'power3.out',
+          },
+          '-=0.2'
+        )
+        // 3. Subtitle
+        .from(
+          '.hero-subtitle',
+          {
+            y: 20,
+            opacity: 0,
+            duration: 0.6,
+            ease: 'power2.out',
+          },
+          '-=0.4'
+        )
+        // 4. Interactive Portal Cards entrance
+        .from(
+          '.portal-card',
+          {
+            y: 40,
+            opacity: 0,
+            stagger: 0.15,
+            duration: 0.7,
+            ease: 'back.out(1.2)',
+          },
+          '-=0.3'
+        )
+        // 5. Institutional trust banner
+        .from(
+          '.trust-banner',
+          {
+            y: 20,
+            opacity: 0,
+            duration: 0.6,
+            ease: 'power2.out',
+          },
+          '-=0.2'
+        );
+    },
+    { scope: containerRef }
+  );
+
+  // Card magnetic hover & click physics handlers
+  const handleCardMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (prefersReducedMotion()) return;
+    const card = e.currentTarget;
+    const icon = card.querySelector('.card-icon');
+    gsap.to(card, { y: -8, duration: 0.3, ease: 'power2.out', overwrite: 'auto' });
+    if (icon) {
+      gsap.to(icon, { scale: 1.15, duration: 0.3, ease: 'power2.out', overwrite: 'auto' });
+    }
+  };
+
+  const handleCardMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (prefersReducedMotion()) return;
+    const card = e.currentTarget;
+    const icon = card.querySelector('.card-icon');
+    gsap.to(card, { y: 0, scale: 1, duration: 0.3, ease: 'power2.inOut', overwrite: 'auto' });
+    if (icon) {
+      gsap.to(icon, { scale: 1, duration: 0.3, ease: 'power2.inOut', overwrite: 'auto' });
+    }
+  };
+
+  const handleCardMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (prefersReducedMotion()) return;
+    gsap.to(e.currentTarget, { scale: 0.98, duration: 0.1, ease: 'power1.out', overwrite: 'auto' });
+  };
+
+  const handleCardMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (prefersReducedMotion()) return;
+    gsap.to(e.currentTarget, { scale: 1, duration: 0.2, ease: 'back.out(2)', overwrite: 'auto' });
+  };
+
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-12">
+    <div ref={containerRef} className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-12">
       {/* Institutional Hero Banner */}
       <div className="text-center space-y-3 sm:space-y-4 max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FAF9F5] border border-[#DDD9CE] text-[11px] sm:text-xs font-semibold text-[#44413B] shadow-xs">
+        <div className="hero-badge inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FAF9F5] border border-[#DDD9CE] text-[11px] sm:text-xs font-semibold text-[#44413B] shadow-xs">
           <ShieldCheck size={14} className="text-[#0F5C55] shrink-0" />
           <span>Rajiv Gandhi University of Knowledge Technologies • RK Valley Campus</span>
         </div>
 
         <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[#1A1A1A] leading-tight font-official-serif">
-          Automated{' '}
-          <span className="bg-gradient-to-r from-emerald-600 via-teal-500 to-green-600 bg-clip-text text-transparent font-extrabold">
+          <span className="hero-title-part inline-block">Automated</span>{' '}
+          <span className="hero-title-part inline-block bg-gradient-to-r from-emerald-600 via-teal-500 to-green-600 bg-clip-text text-transparent font-extrabold">
             No-Dues
           </span>{' '}
-          & Digital Clearance Portal
+          <span className="hero-title-part inline-block">& Digital Clearance Portal</span>
         </h1>
 
-        <p className="text-sm sm:text-base md:text-lg text-[#52504A] max-w-2xl mx-auto leading-relaxed">
+        <p className="hero-subtitle text-sm sm:text-base md:text-lg text-[#52504A] max-w-2xl mx-auto leading-relaxed">
           Three-tier institutional clearance hierarchy, staff-first due verification,
           and cryptographically signed, tamper-evident digital certificates.
         </p>
@@ -46,10 +144,14 @@ export const Landing: React.FC<LandingProps> = ({ onSelectFlow, onQuickDemo }) =
         {/* 1. Student Login */}
         <div
           id="entry-card-student"
-          className="bg-white rounded-2xl border border-[#E5E3DD] p-5 sm:p-7 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group hover:border-[#0F5C55]"
+          onMouseEnter={handleCardMouseEnter}
+          onMouseLeave={handleCardMouseLeave}
+          onMouseDown={handleCardMouseDown}
+          onMouseUp={handleCardMouseUp}
+          className="portal-card bg-white rounded-2xl border border-[#E5E3DD] p-5 sm:p-7 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group hover:border-[#0F5C55] cursor-pointer"
         >
           <div className="space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-[#E6F4F1] border border-[#A3D9D2] flex items-center justify-center text-[#0F5C55] group-hover:scale-105 transition-transform shrink-0">
+            <div className="card-icon w-12 h-12 rounded-xl bg-[#E6F4F1] border border-[#A3D9D2] flex items-center justify-center text-[#0F5C55] transition-transform shrink-0">
               <GraduationCap size={24} />
             </div>
 
@@ -94,10 +196,14 @@ export const Landing: React.FC<LandingProps> = ({ onSelectFlow, onQuickDemo }) =
         {/* 2. Admin Login (Domain-First Selection) */}
         <div
           id="entry-card-admin"
-          className="bg-white rounded-2xl border border-[#E5E3DD] p-5 sm:p-7 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group hover:border-[#33396B]"
+          onMouseEnter={handleCardMouseEnter}
+          onMouseLeave={handleCardMouseLeave}
+          onMouseDown={handleCardMouseDown}
+          onMouseUp={handleCardMouseUp}
+          className="portal-card bg-white rounded-2xl border border-[#E5E3DD] p-5 sm:p-7 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group hover:border-[#33396B] cursor-pointer"
         >
           <div className="space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-[#EEF2FF] border border-[#C7D2FE] flex items-center justify-center text-[#33396B] group-hover:scale-105 transition-transform shrink-0">
+            <div className="card-icon w-12 h-12 rounded-xl bg-[#EEF2FF] border border-[#C7D2FE] flex items-center justify-center text-[#33396B] transition-transform shrink-0">
               <Building2 size={24} />
             </div>
 
@@ -142,10 +248,14 @@ export const Landing: React.FC<LandingProps> = ({ onSelectFlow, onQuickDemo }) =
         {/* 3. Executive Approvals */}
         <div
           id="entry-card-executive"
-          className="bg-white rounded-2xl border border-[#E5E3DD] p-5 sm:p-7 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group hover:border-[#5C2A1E] md:col-span-2 lg:col-span-1"
+          onMouseEnter={handleCardMouseEnter}
+          onMouseLeave={handleCardMouseLeave}
+          onMouseDown={handleCardMouseDown}
+          onMouseUp={handleCardMouseUp}
+          className="portal-card bg-white rounded-2xl border border-[#E5E3DD] p-5 sm:p-7 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group hover:border-[#5C2A1E] md:col-span-2 lg:col-span-1 cursor-pointer"
         >
           <div className="space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-[#FDF2F0] border border-[#F8C8C0] flex items-center justify-center text-[#5C2A1E] group-hover:scale-105 transition-transform shrink-0">
+            <div className="card-icon w-12 h-12 rounded-xl bg-[#FDF2F0] border border-[#F8C8C0] flex items-center justify-center text-[#5C2A1E] transition-transform shrink-0">
               <Award size={24} />
             </div>
 
@@ -189,7 +299,7 @@ export const Landing: React.FC<LandingProps> = ({ onSelectFlow, onQuickDemo }) =
       </div>
 
       {/* System Architecture Highlights (Institutional Trust) */}
-      <div className="bg-[#FAF9F5] border border-[#E5E3DD] rounded-2xl p-5 sm:p-8">
+      <div className="trust-banner bg-[#FAF9F5] border border-[#E5E3DD] rounded-2xl p-5 sm:p-8">
         <div className="text-center max-w-xl mx-auto mb-6">
           <h2 className="text-lg sm:text-xl font-bold text-[#1A1A1A]">
             Institutional Integrity & Compliance Standards
@@ -237,3 +347,4 @@ export const Landing: React.FC<LandingProps> = ({ onSelectFlow, onQuickDemo }) =
     </div>
   );
 };
+

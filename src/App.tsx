@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { AuthSession, StaffAccount, StudentProfile } from './types';
-import { initializeDataStore, getStudentByRollNo, subscribeToStore } from './services/dataStore';
+import { initializeDataStore, getStudentByRollNo, subscribeToStore, resetDemoData } from './services/dataStore';
 import { clearSession, getStoredSession, storeSession } from './services/authService';
 import { Navbar } from './components/Navbar';
+import { RotateCcw } from 'lucide-react';
 
 // Screens
 import { Landing } from './screens/Landing';
@@ -290,17 +291,31 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-[#E5E3DD] bg-white py-4 px-4 sm:px-6 text-center text-xs text-[#78756E] print:hidden">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <span>
             © 2026 Rajiv Gandhi University of Knowledge Technologies, A.P. (RK Valley Campus)
           </span>
-          <div className="flex items-center gap-4 text-[11px]">
-            <span>Automated No-Dues Portal</span>
+          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px]">
+            <button
+              id="footer-reset-demo-data-btn"
+              type="button"
+              onClick={async () => {
+                if (window.confirm('Reset all student clearance records and demo test states to original defaults?')) {
+                  await resetDemoData();
+                  if (session) routeSession(session);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF9F5] hover:bg-[#F2EFE6] border border-[#DDD9CE] text-[#5C2A1E] font-medium transition-colors cursor-pointer"
+              title="Reset all dues and states back to baseline demo personas"
+            >
+              <RotateCcw size={12} />
+              <span>Reset Demo Data</span>
+            </button>
             <span>•</span>
             <button
               type="button"
               onClick={() => setCurrentScreen('public_verify')}
-              className="text-[#0F5C55] hover:underline"
+              className="text-[#0F5C55] hover:underline font-medium"
             >
               Public Certificate Verifier
             </button>
