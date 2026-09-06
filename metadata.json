@@ -1,0 +1,6 @@
+{
+  "name": "RGUKT RK Valley Digital No-Dues & Clearance Portal",
+  "description": "Automated 3-tier digital clearance, staff-first due settlement, cryptographic signing, and tamper-evident certificate portal for RGUKT RK Valley.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

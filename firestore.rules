@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Test connection doc used on initial boot
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Student Clearance Records Collection
+    match /students/{studentId} {
+      allow get: if isValidId(studentId);
+      allow list: if true;
+      allow create, update: if isValidId(studentId);
+      allow delete: if false;
+    }
+
+    // Public Certificate Registry for Verification
+    match /certificates/{certId} {
+      allow get: if isValidId(certId);
+      allow list: if true;
+      allow create, update: if isValidId(certId);
+      allow delete: if false;
+    }
+  }
+}

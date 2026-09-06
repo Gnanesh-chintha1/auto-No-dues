@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Student academic profile and comprehensive 3-tier clearance status with cryptographic signatures",
+      "type": "object",
+      "properties": {
+        "rollNo": { "type": "string", "description": "Student university roll number (e.g. R200142)", "maxLength": 32 },
+        "name": { "type": "string", "description": "Student full legal name", "maxLength": 100 },
+        "branch": { "type": "string", "description": "Academic branch code", "maxLength": 20 },
+        "program": { "type": "string", "description": "Degree program (e.g. B.Tech)", "maxLength": 50 },
+        "gender": { "type": "string", "description": "Gender for hostel assignment", "enum": ["M", "F"] },
+        "batch": { "type": "string", "description": "Academic batch (e.g. 2020-2024)", "maxLength": 20 },
+        "year": { "type": "string", "description": "Year designation (e.g. E4)", "maxLength": 20 },
+        "cgpa": { "type": "number", "description": "Cumulative GPA" },
+        "dues": { "type": "object", "description": "Map of section and lab due records" },
+        "studentAcknowledged": { "type": "boolean", "description": "Student digital acknowledgment status" },
+        "studentAcknowledgedAt": { "type": "string", "description": "ISO timestamp of student e-signature", "maxLength": 50 },
+        "executiveApprovals": { "type": "object", "description": "HOD, DSW, and Registrar approvals" },
+        "certificateIssued": { "type": "boolean", "description": "Whether official certificate has been generated" },
+        "certificateId": { "type": "string", "description": "Unique verification certificate identifier", "maxLength": 64 },
+        "certificateIssuedAt": { "type": "string", "description": "ISO timestamp when certificate was issued", "maxLength": 50 },
+        "masterHash": { "type": "string", "description": "Cryptographic SHA-256 Merkle root of all clearances", "maxLength": 128 },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update", "maxLength": 50 }
+      },
+      "required": ["rollNo", "name", "branch", "dues", "executiveApprovals"]
+    },
+    "PublicCertificate": {
+      "title": "PublicCertificate",
+      "description": "Public cryptographic verification ledger entry for instant QR/ID lookup",
+      "type": "object",
+      "properties": {
+        "certId": { "type": "string", "description": "Certificate ID", "maxLength": 64 },
+        "rollNo": { "type": "string", "description": "Student roll number", "maxLength": 32 },
+        "name": { "type": "string", "description": "Student name", "maxLength": 100 },
+        "branch": { "type": "string", "description": "Student branch", "maxLength": 20 },
+        "masterHash": { "type": "string", "description": "SHA-256 Master Merkle Hash", "maxLength": 128 },
+        "issuedAt": { "type": "string", "description": "Issuance timestamp", "maxLength": 50 },
+        "signStampsCount": { "type": "number", "description": "Total count of digital signatures" }
+      },
+      "required": ["certId", "rollNo", "masterHash", "issuedAt"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Stores student clearance records across all 3 tiers"
+    },
+    "/certificates/{certId}": {
+      "schema": { "$ref": "#/entities/PublicCertificate" },
+      "description": "Public certificate registry for external QR verification"
+    },
+    "/test/{docId}": {
+      "schema": "object",
+      "description": "Connection test collection"
+    }
+  }
+}
